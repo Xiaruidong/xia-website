@@ -1,0 +1,74 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --米白: #F8F6F3;
+  --浅青灰: #8A9A9D;
+  --霜蓝: #C8D9E6;
+  --深霜蓝: #9BB8CE;
+  --浅雾: #E8EFF4;
+  --柔白: #FAF9F7;
+  --text-dark: #5A6A6D;
+  --text-light: #7A8A8D;
+}
+
+body {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, sans-serif;
+  background: linear-gradient(180deg, #E8EFF4 0%, #F8F6F3 50%, #FAF9F7 100%);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#app {
+  min-height: 100vh;
+  position: relative;
+}
+
+/* 飘雪效果 */
+.snowflake {
+  position: fixed;
+  top: -10px;
+  color: var(--霜蓝);
+  font-size: 1em;
+  opacity: 0.8;
+  pointer-events: none;
+  animation: fall linear infinite;
+  z-index: 0;
+}
+
+@keyframes fall {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0.3;
+  }
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--米白);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--霜蓝);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--深霜蓝);
+}
