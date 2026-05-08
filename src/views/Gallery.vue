@@ -30,8 +30,9 @@
           class="gallery-item"
           @click="openLightbox(item)"
         >
-          <div class="gallery-image" :style="{ background: item.gradient }">
-            <span class="image-icon">{{ item.icon }}</span>
+          <div class="gallery-image" :style="getImageStyle(item)">
+            <img v-if="item.type === 'image'" :src="item.image" class="image-actual" />
+            <span v-else class="image-icon">{{ item.icon }}</span>
           </div>
           <div class="gallery-info">
             <h3 class="item-title">{{ item.title }}</h3>
@@ -54,10 +55,11 @@
     <!-- Lightbox -->
     <transition name="lightbox">
       <div v-if="lightboxOpen" class="lightbox" @click="closeLightbox">
-        <button class="lightbox-close" @click.stop="closeLightback">×</button>
+        <button class="lightbox-close" @click.stop="closeLightbox">×</button>
         <div class="lightbox-content" @click.stop>
-          <div class="lightbox-image" :style="{ background: selectedItem?.gradient }">
-            <span class="lightbox-icon">{{ selectedItem?.icon }}</span>
+          <div class="lightbox-image" :style="getLightboxImageStyle(selectedItem)">
+            <img v-if="selectedItem?.type === 'image'" :src="selectedItem.image" class="lightbox-image-actual" />
+            <span v-else class="lightbox-icon">{{ selectedItem?.icon }}</span>
           </div>
           <div class="lightbox-info">
             <h2 class="lightbox-title">{{ selectedItem?.title }}</h2>
@@ -123,6 +125,20 @@ const openLightbox = (item) => {
 const closeLightbox = () => {
   lightboxOpen.value = false
   document.body.style.overflow = ''
+}
+
+const getImageStyle = (item) => {
+  if (item.type === 'image') {
+    return { background: '#f5f5f5' }
+  }
+  return { background: item.gradient }
+}
+
+const getLightboxImageStyle = (item) => {
+  if (item?.type === 'image') {
+    return { background: 'transparent' }
+  }
+  return { background: item?.gradient }
 }
 
 const navigate = (direction) => {
@@ -250,6 +266,14 @@ onUnmounted(() => {
   position: relative;
 }
 
+.image-actual {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .image-icon {
   font-size: 5rem;
   opacity: 0.8;
@@ -345,6 +369,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.lightbox-image-actual {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .lightbox-icon {

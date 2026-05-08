@@ -13,10 +13,12 @@
         :key="item.id"
         class="gallery-item"
       >
-        <div class="item-preview" :style="{ background: item.gradient }">
-          <span class="item-icon">{{ item.icon }}</span>
+        <div class="item-preview" :style="getItemPreviewStyle(item)">
+          <img v-if="item.type === 'image'" :src="item.image" class="item-image" />
+          <span v-else class="item-icon">{{ item.icon }}</span>
         </div>
         <div class="item-info">
+          <div class="item-type-badge">{{ item.type === 'image' ? '图片' : '图标' }}</div>
           <h3 class="item-title">{{ item.title }}</h3>
           <p class="item-description">{{ item.description }}</p>
           <div class="item-meta">
@@ -86,7 +88,33 @@
               </div>
             </div>
 
+            <!-- 类型选择 -->
             <div class="form-group">
+              <label>作品类型</label>
+              <div class="type-selector">
+                <button
+                  type="button"
+                  class="type-btn"
+                  :class="{ active: itemForm.type === 'icon' }"
+                  @click="itemForm.type = 'icon'"
+                >
+                  <span>🎨</span>
+                  <span>Emoji 图标</span>
+                </button>
+                <button
+                  type="button"
+                  class="type-btn"
+                  :class="{ active: itemForm.type === 'image' }"
+                  @click="itemForm.type = 'image'"
+                >
+                  <span>🖼️</span>
+                  <span>上传图片</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Emoji 图标选项 -->
+            <div v-if="itemForm.type === 'icon'" class="form-group">
               <label for="itemIcon">图标 emoji</label>
               <input
                 id="itemIcon"
@@ -103,22 +131,51 @@
                   class="emoji-option"
                 >{{ emoji }}</span>
               </div>
-            </div>
 
-            <div class="form-group">
-              <label for="itemGradient">渐变色</label>
-              <div class="gradient-options">
-                <div
-                  v-for="gradient in gradients"
-                  :key="gradient.value"
-                  class="gradient-option"
-                  :class="{ active: itemForm.gradient === gradient.value }"
-                  :style="{ background: gradient.value }"
-                  @click="itemForm.gradient = gradient.value"
-                >
-                  <span v-if="itemForm.gradient === gradient.value" class="check">✓</span>
+              <div class="form-group">
+                <label for="itemGradient">渐变色</label>
+                <div class="gradient-options">
+                  <div
+                    v-for="gradient in gradients"
+                    :key="gradient.value"
+                    class="gradient-option"
+                    :class="{ active: itemForm.gradient === gradient.value }"
+                    :style="{ background: gradient.value }"
+                    @click="itemForm.gradient = gradient.value"
+                  >
+                    <span v-if="itemForm.gradient === gradient.value" class="check">✓</span>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <!-- 图片上传选项 -->
+            <div v-if="itemForm.type === 'image'" class="form-group">
+              <label for="itemImage">上传图片</label>
+              <div class="image-upload">
+                <input
+                  id="itemImage"
+                  type="file"
+                  accept="image/*,.gif"
+                  @change="handleImageUpload"
+                  class="file-input"
+                  ref="fileInput"
+                />
+                <div class="upload-area" @click="$refs.fileInput.click()">
+                  <div v-if="!itemForm.image" class="upload-placeholder">
+                    <span class="upload-icon">📤</span>
+                    <span>点击上传图片</span>
+                    <span class="upload-hint">支持 PNG, JPG, GIF</span>
+                  </div>
+                  <div v-else class="upload-preview">
+                    <img :src="itemForm.image" />
+                    <button type="button" @click.prevent="removeImage" class="remove-image">
+                      ×
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p v-if="imageSize" class="image-size-info">图片大小: {{ imageSize }}</p>
             </div>
 
             <div class="modal-actions">
@@ -139,13 +196,17 @@ import { getGalleryItems, addGalleryItem, updateGalleryItem, deleteGalleryItem }
 const galleryItems = ref([])
 const showAddModal = ref(false)
 const editingItem = ref(null)
+const fileInput = ref(null)
+const imageSize = ref('')
 
 const itemForm = ref({
   title: '',
   description: '',
   categoryId: 'winter',
   date: '',
+  type: 'icon',
   icon: '❄️',
+  image: '',
   gradient: 'linear-gradient(135deg, #E8EFF4 0%, #C8D9E6 100%)'
 })
 
@@ -156,7 +217,7 @@ const categoryMap = {
   detail: '细节'
 }
 
-const commonEmojis = ['❄️', '🌲', '🍵', '🌫', '🕯️', '🍂', '💎', '🌆', '📖', '☁️', '🌙', '⭐']
+const commonEmojis = ['❄️', '🌲', '🍵', '🌫', '🕯️', '🍂', '💎', '🌆', '📖', '☁️', '🌙', '⭐', '🎮', '👾', '🎨', '✨']
 
 const gradients = [
   { value: 'linear-gradient(135deg, #E8EFF4 0%, #C8D9E6 100%)', name: '浅蓝' },
@@ -175,6 +236,13 @@ const loadGallery = () => {
   galleryItems.value = getGalleryItems()
 }
 
+const getItemPreviewStyle = (item) => {
+  if (item.type === 'image') {
+    return { background: '#f5f5f5' }
+  }
+  return { background: item.gradient }
+}
+
 const closeModal = () => {
   showAddModal.value = false
   editingItem.value = null
@@ -183,9 +251,12 @@ const closeModal = () => {
     description: '',
     categoryId: 'winter',
     date: '',
+    type: 'icon',
     icon: '❄️',
+    image: '',
     gradient: 'linear-gradient(135deg, #E8EFF4 0%, #C8D9E6 100%)'
   }
+  imageSize.value = ''
 }
 
 const editItem = (item) => {
@@ -195,15 +266,57 @@ const editItem = (item) => {
     description: item.description,
     categoryId: item.categoryId,
     date: item.date,
-    icon: item.icon,
-    gradient: item.gradient
+    type: item.type || 'icon',
+    icon: item.icon || '❄️',
+    image: item.image || '',
+    gradient: item.gradient || 'linear-gradient(135deg, #E8EFF4 0%, #C8D9E6 100%)'
+  }
+  if (item.image) {
+    imageSize.value = formatImageSize(item.image.length)
   }
   showAddModal.value = true
+}
+
+const handleImageUpload = (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  // 检查文件大小 (限制为 2MB)
+  if (file.size > 2 * 1024 * 1024) {
+    alert('图片大小不能超过 2MB，请选择更小的图片')
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    itemForm.value.image = e.target.result
+    imageSize.value = formatImageSize(file.size)
+  }
+  reader.readAsDataURL(file)
+}
+
+const formatImageSize = (bytes) => {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
+}
+
+const removeImage = () => {
+  itemForm.value.image = ''
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
+  imageSize.value = ''
 }
 
 const saveItem = () => {
   if (!itemForm.value.title) {
     alert('请输入作品标题')
+    return
+  }
+
+  if (itemForm.value.type === 'image' && !itemForm.value.image) {
+    alert('请上传图片')
     return
   }
 
@@ -213,7 +326,9 @@ const saveItem = () => {
     category: categoryMap[itemForm.value.categoryId],
     categoryId: itemForm.value.categoryId,
     date: itemForm.value.date,
+    type: itemForm.value.type,
     icon: itemForm.value.icon,
+    image: itemForm.value.image,
     gradient: itemForm.value.gradient
   }
 
@@ -292,6 +407,15 @@ const confirmDelete = (item) => {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+}
+
+.item-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .item-icon {
@@ -300,6 +424,16 @@ const confirmDelete = (item) => {
 
 .item-info {
   padding: 15px;
+}
+
+.item-type-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: var(--浅雾);
+  border-radius: 10px;
+  font-size: 0.75rem;
+  color: var(--深霜蓝);
+  margin-bottom: 8px;
 }
 
 .item-title {
@@ -460,6 +594,45 @@ const confirmDelete = (item) => {
   gap: 15px;
 }
 
+/* Type Selector */
+.type-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 15px;
+  background: var(--浅雾);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.type-btn:hover {
+  background: var(--霜蓝);
+}
+
+.type-btn.active {
+  border-color: var(--浅青灰);
+  background: var(--霜蓝);
+}
+
+.type-btn span:first-child {
+  font-size: 1.5rem;
+}
+
+.type-btn span:last-child {
+  font-size: 0.85rem;
+  color: var(--浅青灰);
+}
+
+/* Emoji Picker */
 .emoji-picker {
   display: flex;
   flex-wrap: wrap;
@@ -480,6 +653,7 @@ const confirmDelete = (item) => {
   transform: scale(1.2);
 }
 
+/* Gradient Options */
 .gradient-options {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -511,6 +685,89 @@ const confirmDelete = (item) => {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
+/* Image Upload */
+.image-upload {
+  margin-top: 8px;
+}
+
+.file-input {
+  display: none;
+}
+
+.upload-area {
+  border: 2px dashed var(--霜蓝);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-area:hover {
+  border-color: var(--深霜蓝);
+  background: var(--浅雾);
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 30px;
+  color: var(--浅青灰);
+}
+
+.upload-icon {
+  font-size: 2.5rem;
+}
+
+.upload-hint {
+  font-size: 0.75rem;
+  color: var(--text-light);
+}
+
+.upload-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.upload-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  max-height: 200px;
+}
+
+.remove-image {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 0.3s ease;
+}
+
+.remove-image:hover {
+  background: rgba(239, 83, 80, 0.9);
+  transform: scale(1.1);
+}
+
+.image-size-info {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin-top: 5px;
+}
+
+/* Modal Actions */
 .modal-actions {
   display: flex;
   gap: 15px;

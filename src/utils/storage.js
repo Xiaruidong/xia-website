@@ -163,6 +163,7 @@ export const initSampleData = () => {
         categoryId: 'winter',
         date: '2024.12.01',
         gradient: 'linear-gradient(135deg, #E8EFF4 0%, #C8D9E6 100%)',
+        type: 'icon',
         createdAt: '2024-12-01T00:00:00.000Z'
       },
       {
@@ -174,6 +175,7 @@ export const initSampleData = () => {
         categoryId: 'nature',
         date: '2024.11.28',
         gradient: 'linear-gradient(135deg, #9BB8CE 0%, #8A9A9D 100%)',
+        type: 'icon',
         createdAt: '2024-11-28T00:00:00.000Z'
       }
     ]
