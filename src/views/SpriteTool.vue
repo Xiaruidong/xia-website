@@ -49,7 +49,7 @@
               type="number"
               min="1"
               class="config-input"
-              @input="updatePreview"
+              @input="onConfigChange"
             />
           </div>
 
@@ -60,7 +60,7 @@
               type="number"
               min="1"
               class="config-input"
-              @input="updatePreview"
+              @input="onConfigChange"
             />
           </div>
 
@@ -82,9 +82,9 @@
               type="number"
               min="0"
               class="config-input"
-              @input="updatePreview"
+              @input="onConfigChange"
             />
-            <span class="hint">当前: {{ frames.length }} 帧</span>
+            <span class="hint">当前: {{ frameCount }} 帧</span>
           </div>
         </div>
 
@@ -131,7 +131,16 @@
 
           <div class="preview-card">
             <h3>动画预览</h3>
-            <canvas ref="animationCanvas" class="animation-canvas" :width="config.frameWidth" :height="config.frameHeight"></canvas>
+            <canvas
+              ref="animationCanvas"
+              class="animation-canvas"
+              :width="config.frameWidth"
+              :height="config.frameHeight"
+              :style="{
+                width: Math.max(config.frameWidth, 128) + 'px',
+                height: Math.max(config.frameHeight, 128) + 'px'
+              }"
+            ></canvas>
             <div v-if="generatedGIF" class="generated-gif">
               <h4>生成的 GIF</h4>
               <img :src="generatedGIF" class="generated-image" />
@@ -145,7 +154,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onUnmounted, nextTick } from 'vue'
 
 const fileInput = ref(null)
 const spriteImage = ref(null)
@@ -158,6 +167,7 @@ const previewCanvas = ref(null)
 const animationCanvas = ref(null)
 
 let animationInterval = null
+let debounceTimer = null
 
 const config = ref({
   frameWidth: 32,
@@ -205,9 +215,9 @@ const processFile = (file) => {
     spriteImage.value = e.target.result
 
     const img = new Image()
-    img.onload = () => {
+    img.onload = async () => {
       imageInfo.value = `${img.width} × ${img.height} px`
-      detectFromImage()
+      await detectFromImage()
       extractFrames()
     }
     img.src = e.target.result
@@ -230,14 +240,22 @@ const applyPreset = (width, height) => {
   config.value.frameWidth = width
   config.value.frameHeight = height
   extractFrames()
-  updatePreview()
 }
 
-const detectFromImage = () => {
+const detectFromImage = async () => {
   if (!spriteImage.value) return
 
   const img = new Image()
   img.src = spriteImage.value
+
+  await new Promise((resolve) => {
+    if (img.complete && img.naturalWidth > 0) {
+      resolve()
+    } else {
+      img.onload = resolve
+      img.onerror = () => resolve()
+    }
+  })
 
   const possibleSizes = [8, 16, 32, 64, 128]
 
@@ -255,19 +273,37 @@ const detectFromImage = () => {
   }
 }
 
+const onConfigChange = () => {
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    extractFrames()
+  }, 300)
+}
+
 const extractFrames = async () => {
   if (!spriteImage.value) return
+
+  // 参数校验
+  if (config.value.frameWidth <= 0 || config.value.frameHeight <= 0) return
 
   const img = new Image()
   img.src = spriteImage.value
 
-  await new Promise(resolve => {
-    img.onload = resolve
-    if (img.complete) resolve()
+  await new Promise((resolve) => {
+    if (img.complete && img.naturalWidth > 0) {
+      resolve()
+    } else {
+      img.onload = resolve
+      img.onerror = () => resolve()
+    }
   })
 
   const cols = Math.floor(img.width / config.value.frameWidth)
   const rows = Math.floor(img.height / config.value.frameHeight)
+
+  // 校验有效帧数
+  if (cols <= 0 || rows <= 0) return
+
   const totalFrames = config.value.maxFrames > 0
     ? Math.min(cols * rows, config.value.maxFrames)
     : cols * rows
@@ -315,15 +351,21 @@ const updatePreview = async () => {
   ctx.fillStyle = '#f5f5f5'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-  frames.value.forEach((frameData, index) => {
+  // 预加载所有图片后再统一绘制
+  const loadImage = (src) => new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = src
+  })
+
+  const images = await Promise.all(frames.value.map(loadImage))
+
+  images.forEach((img, index) => {
+    if (!img) return
     const col = index % maxCols
     const row = Math.floor(index / maxCols)
-
-    const img = new Image()
-    img.onload = () => {
-      ctx.drawImage(img, col * (cellSize + 5), row * (cellSize + 5), cellSize, cellSize)
-    }
-    img.src = frameData
+    ctx.drawImage(img, col * (cellSize + 5), row * (cellSize + 5), cellSize, cellSize)
   })
 }
 
@@ -374,24 +416,22 @@ const generateGIF = async () => {
   isGenerating.value = true
 
   try {
-    // 使用 gifshot 库生成 GIF
     const gifshot = await import('gifshot')
 
     const result = await new Promise((resolve, reject) => {
-      gifshot.default({
+      gifshot.default.createGIF({
         images: frames.value,
         gifWidth: config.value.frameWidth,
         gifHeight: config.value.frameHeight,
-        interval: config.value.duration / 10,
-        numFrames: frames.value.length,
-        frameDuration: config.value.duration / 10,
+        interval: config.value.duration / 1000,
+        frameDuration: Math.round(config.value.duration / 10),
         sampleInterval: 10,
         numWorkers: 2,
-      }, (error, result) => {
-        if (error) {
-          reject(error)
+      }, (obj) => {
+        if (obj.error) {
+          reject(new Error(obj.errorMsg || 'GIF 生成失败'))
         } else {
-          resolve(result)
+          resolve(obj)
         }
       })
     })
@@ -417,6 +457,7 @@ const downloadGIF = () => {
 
 onUnmounted(() => {
   stopAnimation()
+  clearTimeout(debounceTimer)
 })
 </script>
 
@@ -712,6 +753,8 @@ section {
   border-radius: 10px;
   background: var(--浅雾);
   margin: 0 auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .frames-preview {
