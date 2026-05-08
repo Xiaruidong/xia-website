@@ -82,6 +82,7 @@
               type="number"
               min="1"
               class="config-input"
+              @input="updatePreview"
             />
           </div>
         </div>
@@ -97,9 +98,14 @@
           </div>
         </div>
 
-        <button @click="generateGif" class="generate-btn" :disabled="isGenerating">
-          {{ isGenerating ? '生成中...' : '生成 GIF 动图' }}
-        </button>
+        <div class="action-buttons">
+          <button @click="previewAnimation" class="preview-btn">
+            {{ isPlaying ? '停止预览' : '预览动画' }}
+          </button>
+          <button @click="generateGIF" class="generate-btn" :disabled="isGenerating">
+            {{ isGenerating ? '生成中...' : '生成 GIF' }}
+          </button>
+        </div>
       </section>
 
       <!-- 预览区域 -->
@@ -116,19 +122,20 @@
           </div>
 
           <div class="preview-card">
-            <h3>切割预览</h3>
+            <h3>切割预览 ({{ frameCount }} 帧)</h3>
             <div class="frames-preview">
               <canvas ref="previewCanvas" class="preview-canvas"></canvas>
             </div>
-            <p class="image-info">共 {{ frameCount }} 帧</p>
           </div>
 
-          <div v-if="generatedGif" class="preview-card">
-            <h3>生成的 GIF</h3>
-            <div class="image-container">
-              <img :src="generatedGif" class="preview-image" />
+          <div class="preview-card">
+            <h3>动画预览</h3>
+            <canvas ref="animationCanvas" class="animation-canvas" :width="config.frameWidth" :height="config.frameHeight"></canvas>
+            <div v-if="generatedGIF" class="generated-gif">
+              <h4>生成的 GIF</h4>
+              <img :src="generatedGIF" class="generated-image" />
+              <button @click="downloadGIF" class="download-btn">下载 GIF</button>
             </div>
-            <button @click="downloadGif" class="download-btn">下载 GIF</button>
           </div>
         </div>
       </section>
@@ -137,15 +144,19 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 
 const fileInput = ref(null)
 const spriteImage = ref(null)
 const imageInfo = ref('')
-const generatedGif = ref(null)
+const generatedGIF = ref(null)
 const isGenerating = ref(false)
 const isDragOver = ref(false)
+const isPlaying = ref(false)
 const previewCanvas = ref(null)
+const animationCanvas = ref(null)
+
+let animationInterval = null
 
 const config = ref({
   frameWidth: 32,
@@ -154,24 +165,21 @@ const config = ref({
   maxFrames: 100
 })
 
+const frames = ref([])
+
 const frameCount = computed(() => {
-  if (!spriteImage.value) return 0
-  const img = new Image()
-  img.src = spriteImage.value
-  const cols = Math.floor(img.width / config.value.frameWidth)
-  const rows = Math.floor(img.height / config.value.frameHeight)
-  return Math.min(cols * rows, config.value.maxFrames)
+  return frames.value.length
 })
 
 const triggerUpload = () => {
   fileInput.value.click()
 }
 
-const handleDragOver = (e) => {
+const handleDragOver = () => {
   isDragOver.value = true
 }
 
-const handleDragLeave = (e) => {
+const handleDragLeave = () => {
   isDragOver.value = false
 }
 
@@ -199,7 +207,7 @@ const processFile = (file) => {
     img.onload = () => {
       imageInfo.value = `${img.width} × ${img.height} px`
       detectFromImage()
-      updatePreview()
+      extractFrames()
     }
     img.src = e.target.result
   }
@@ -209,7 +217,9 @@ const processFile = (file) => {
 const clearImage = () => {
   spriteImage.value = null
   imageInfo.value = ''
-  generatedGif.value = null
+  generatedGIF.value = null
+  frames.value = []
+  stopAnimation()
   if (fileInput.value) {
     fileInput.value.value = ''
   }
@@ -218,6 +228,7 @@ const clearImage = () => {
 const applyPreset = (width, height) => {
   config.value.frameWidth = width
   config.value.frameHeight = height
+  extractFrames()
   updatePreview()
 }
 
@@ -227,7 +238,6 @@ const detectFromImage = () => {
   const img = new Image()
   img.src = spriteImage.value
 
-  // 尝试检测常见的像素画尺寸
   const possibleSizes = [8, 16, 32, 64, 128]
 
   for (const size of possibleSizes) {
@@ -235,7 +245,6 @@ const detectFromImage = () => {
       const cols = img.width / size
       const rows = img.height / size
 
-      // 如果行列数合理（不太少也不太多）
       if (cols >= 2 && cols <= 20 && rows >= 1 && rows <= 20) {
         config.value.frameWidth = size
         config.value.frameHeight = size
@@ -245,142 +254,167 @@ const detectFromImage = () => {
   }
 }
 
-const updatePreview = async () => {
-  if (!spriteImage.value || !previewCanvas.value) return
-
-  await nextTick()
+const extractFrames = async () => {
+  if (!spriteImage.value) return
 
   const img = new Image()
   img.src = spriteImage.value
 
-  img.onload = () => {
-    const canvas = previewCanvas.value
-    const ctx = canvas.getContext('2d')
+  await new Promise(resolve => {
+    img.onload = resolve
+    if (img.complete) resolve()
+  })
 
-    const cols = Math.floor(img.width / config.value.frameWidth)
-    const rows = Math.floor(img.height / config.value.frameHeight)
-    const totalFrames = Math.min(cols * rows, config.value.maxFrames)
+  const cols = Math.floor(img.width / config.value.frameWidth)
+  const rows = Math.floor(img.height / config.value.frameHeight)
+  const totalFrames = Math.min(cols * rows, config.value.maxFrames)
 
-    // 设置canvas大小
-    const maxCols = Math.min(cols, 10)
-    const previewRows = Math.ceil(totalFrames / maxCols)
-    canvas.width = maxCols * 60
-    canvas.height = previewRows * 60
+  frames.value = []
 
-    ctx.fillStyle = '#f5f5f5'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+  for (let row = 0; row < rows && frames.value.length < totalFrames; row++) {
+    for (let col = 0; col < cols && frames.value.length < totalFrames; col++) {
+      const canvas = document.createElement('canvas')
+      canvas.width = config.value.frameWidth
+      canvas.height = config.value.frameHeight
+      const ctx = canvas.getContext('2d')
 
-    // 绘制帧预览
-    let frameIndex = 0
-    for (let row = 0; row < rows && frameIndex < totalFrames; row++) {
-      for (let col = 0; col < cols && frameIndex < totalFrames; col++) {
-        const previewCol = frameIndex % maxCols
-        const previewRow = Math.floor(frameIndex / maxCols)
+      const sx = col * config.value.frameWidth
+      const sy = row * config.value.frameHeight
 
-        const sx = col * config.value.frameWidth
-        const sy = row * config.value.frameHeight
-        const dx = previewCol * 60 + 5
-        const dy = previewRow * 60 + 5
+      ctx.drawImage(
+        img,
+        sx, sy, config.value.frameWidth, config.value.frameHeight,
+        0, 0, config.value.frameWidth, config.value.frameHeight
+      )
 
-        ctx.drawImage(
-          img,
-          sx, sy, config.value.frameWidth, config.value.frameHeight,
-          dx, dy, 50, 50
-        )
-
-        frameIndex++
-      }
+      frames.value.push(canvas.toDataURL('image/png'))
     }
+  }
+
+  updatePreview()
+}
+
+const updatePreview = async () => {
+  if (!previewCanvas.value || frames.value.length === 0) return
+
+  await nextTick()
+
+  const canvas = previewCanvas.value
+  const ctx = canvas.getContext('2d')
+
+  const maxCols = Math.min(frames.value.length, 10)
+  const previewRows = Math.ceil(frames.value.length / maxCols)
+  const cellSize = 50
+
+  canvas.width = maxCols * (cellSize + 5)
+  canvas.height = previewRows * (cellSize + 5)
+
+  ctx.fillStyle = '#f5f5f5'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  frames.value.forEach((frameData, index) => {
+    const col = index % maxCols
+    const row = Math.floor(index / maxCols)
+
+    const img = new Image()
+    img.onload = () => {
+      ctx.drawImage(img, col * (cellSize + 5), row * (cellSize + 5), cellSize, cellSize)
+    }
+    img.src = frameData
+  })
+}
+
+const previewAnimation = () => {
+  if (frames.value.length === 0) return
+
+  if (isPlaying.value) {
+    stopAnimation()
+  } else {
+    startAnimation()
   }
 }
 
-const generateGif = async () => {
-  if (!spriteImage.value || isGenerating.value) return
+const startAnimation = () => {
+  if (!animationCanvas.value || frames.value.length === 0) return
+
+  isPlaying.value = true
+  let currentFrame = 0
+
+  const canvas = animationCanvas.value
+  const ctx = canvas.getContext('2d')
+
+  const animate = () => {
+    const img = new Image()
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0)
+      currentFrame = (currentFrame + 1) % frames.value.length
+      animationInterval = setTimeout(animate, config.value.duration)
+    }
+    img.src = frames.value[currentFrame]
+  }
+
+  animate()
+}
+
+const stopAnimation = () => {
+  isPlaying.value = false
+  if (animationInterval) {
+    clearTimeout(animationInterval)
+    animationInterval = null
+  }
+}
+
+const generateGIF = async () => {
+  if (frames.value.length === 0 || isGenerating.value) return
 
   isGenerating.value = true
 
   try {
-    const img = new Image()
-    img.src = spriteImage.value
+    // 使用 gifshot 库生成 GIF
+    const gifshot = await import('gifshot')
 
-    await new Promise(resolve => {
-      img.onload = resolve
-      if (img.complete) resolve()
+    const result = await new Promise((resolve, reject) => {
+      gifshot.default({
+        images: frames.value,
+        gifWidth: config.value.frameWidth,
+        gifHeight: config.value.frameHeight,
+        interval: config.value.duration / 10,
+        numFrames: frames.value.length,
+        frameDuration: config.value.duration / 10,
+        sampleInterval: 10,
+        numWorkers: 2,
+      }, (error, result) => {
+        if (error) {
+          reject(error)
+        } else {
+          resolve(result)
+        }
+      })
     })
 
-    const cols = Math.floor(img.width / config.value.frameWidth)
-    const rows = Math.floor(img.height / config.value.frameHeight)
-    const totalFrames = Math.min(cols * rows, config.value.maxFrames)
-
-    // 创建canvas来生成每一帧
-    const frames = []
-
-    for (let row = 0; row < rows && frames.length < totalFrames; row++) {
-      for (let col = 0; col < cols && frames.length < totalFrames; col++) {
-        const canvas = document.createElement('canvas')
-        canvas.width = config.value.frameWidth
-        canvas.height = config.value.frameHeight
-        const ctx = canvas.getContext('2d')
-
-        const sx = col * config.value.frameWidth
-        const sy = row * config.value.frameHeight
-
-        ctx.drawImage(
-          img,
-          sx, sy, config.value.frameWidth, config.value.frameHeight,
-          0, 0, config.value.frameWidth, config.value.frameHeight
-        )
-
-        frames.push(canvas.toDataURL('image/png'))
-      }
-    }
-
-    // 使用 gif.js 生成 GIF
-    // 这里使用一个简化的方法，使用 canvas 动画预览
-    // 实际的 GIF 生成需要使用 gifshot 或 gif.js 库
-
-    // 为了演示，我们创建一个动画预览
-    const previewCanvas = document.createElement('canvas')
-    previewCanvas.width = config.value.frameWidth
-    previewCanvas.height = config.value.frameHeight
-    const ctx = previewCanvas.getContext('2d')
-
-    let currentFrame = 0
-    const animateFrame = () => {
-      const img = new Image()
-      img.onload = () => {
-        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height)
-        ctx.drawImage(img, 0, 0)
-        currentFrame = (currentFrame + 1) % frames.length
-        setTimeout(animateFrame, config.value.duration)
-      }
-      img.src = frames[currentFrame]
-    }
-
-    animateFrame()
-
-    // 设置生成的GIF为动画预览
-    generatedGif.value = previewCanvas.toDataURL()
-
-    // 提示用户使用工具下载
-    alert(`已生成 ${frames.length} 帧动画预览！\n\n如需下载为 GIF 文件，可以使用以下工具：\n- https://ezgif.com/sprite-to-gif\n- 或使用 "下载配置" 导出帧图片`)
+    generatedGIF.value = result.image
 
   } catch (error) {
-    console.error('生成 GIF 失败:', error)
-    alert('生成失败，请检查图片格式和参数设置')
+    console.error('GIF生成失败:', error)
+    alert('GIF 生成失败：' + error.message)
   } finally {
     isGenerating.value = false
   }
 }
 
-const downloadGif = () => {
-  if (!generatedGif.value) return
+const downloadGIF = () => {
+  if (!generatedGIF.value) return
 
   const link = document.createElement('a')
   link.download = 'sprite-animation.gif'
-  link.href = generatedGif.value
+  link.href = generatedGIF.value
   link.click()
 }
+
+onUnmounted(() => {
+  stopAnimation()
+})
 </script>
 
 <style scoped>
@@ -575,17 +609,38 @@ section {
   color: var(--米白);
 }
 
+.action-buttons {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.preview-btn,
 .generate-btn {
-  width: 100%;
+  flex: 1;
+  min-width: 200px;
   padding: 15px 30px;
-  background: var(--浅青灰);
-  color: var(--米白);
   border: none;
   border-radius: 15px;
   font-size: 1.1rem;
   letter-spacing: 0.15rem;
   cursor: pointer;
   transition: all 0.3s ease;
+}
+
+.preview-btn {
+  background: var(--浅雾);
+  color: var(--浅青灰);
+}
+
+.preview-btn:hover {
+  background: var(--霜蓝);
+  color: var(--米白);
+}
+
+.generate-btn {
+  background: var(--浅青灰);
+  color: var(--米白);
 }
 
 .generate-btn:hover:not(:disabled) {
@@ -639,6 +694,15 @@ section {
 .preview-canvas {
   max-width: 100%;
   height: auto;
+  border: 1px solid var(--浅雾);
+  border-radius: 10px;
+}
+
+.animation-canvas {
+  border: 1px solid var(--浅雾);
+  border-radius: 10px;
+  background: var(--浅雾);
+  margin: 0 auto;
 }
 
 .frames-preview {
@@ -653,8 +717,24 @@ section {
   color: var(--text-light);
 }
 
+.generated-gif {
+  margin-top: 20px;
+}
+
+.generated-gif h4 {
+  font-size: 1rem;
+  color: var(--浅青灰);
+  margin-bottom: 10px;
+}
+
+.generated-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  margin-bottom: 15px;
+}
+
 .download-btn {
-  margin-top: 15px;
   padding: 10px 25px;
   background: var(--浅青灰);
   color: var(--米白);
@@ -684,6 +764,10 @@ section {
 
   .preview-grid {
     grid-template-columns: 1fr;
+  }
+
+  .action-buttons {
+    flex-direction: column;
   }
 }
 </style>

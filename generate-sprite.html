@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>生成测试雪碧图</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: white;
+    }
+    h1 {
+      margin-bottom: 30px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .container {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      max-width: 800px;
+    }
+    canvas {
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 10px;
+      margin: 20px 0;
+      background: white;
+    }
+    .button-group {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 15px 40px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 25px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px;
+      transition: all 0.3s ease;
+    }
+    button:hover {
+      background: #45a049;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    button.secondary {
+      background: #2196F3;
+    }
+    button.secondary:hover {
+      background: #0b7dda;
+    }
+    .info {
+      margin-top: 20px;
+      text-align: center;
+      opacity: 0.9;
+      background: rgba(255,255,255,0.1);
+      padding: 20px;
+      border-radius: 15px;
+    }
+    .preview {
+      margin-top: 20px;
+      padding: 20px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 15px;
+      text-align: center;
+    }
+    .preview h3 {
+      margin-bottom: 15px;
+    }
+    .preview canvas {
+      margin: 0 auto;
+      display: block;
+    }
+    .gif-output {
+      margin-top: 20px;
+      padding: 20px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 15px;
+      text-align: center;
+    }
+    .gif-output img {
+      max-width: 100%;
+      border-radius: 10px;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    .settings {
+      margin: 20px 0;
+      padding: 20px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 15px;
+    }
+    .settings label {
+      display: inline-block;
+      margin-right: 15px;
+      margin-bottom: 10px;
+    }
+    .settings input {
+      padding: 8px 15px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      width: 80px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎮 雪碧图生成器 & GIF转换器</h1>
+
+  <div class="container">
+    <h2>1. 动画预览</h2>
+    <div class="preview">
+      <canvas id="previewCanvas" width="64" height="64"></canvas>
+      <p style="margin-top: 10px;">动画预览 (64×64)</p>
+    </div>
+
+    <h2>2. 生成的雪碧图</h2>
+    <canvas id="spriteCanvas" width="320" height="64"></canvas>
+    <p style="text-align: center; margin-bottom: 20px;">雪碧图 (5帧 × 64px，共 320×64)</p>
+
+    <h2>3. GIF 生成设置</h2>
+    <div class="settings">
+      <label>帧间隔:
+        <input type="number" id="duration" value="200" min="50" max="1000" step="50"> ms
+      </label>
+      <label>重复次数:
+        <input type="number" id="loops" value="0" min="0" max="10"> (0=无限)
+      </label>
+    </div>
+
+    <div class="button-group">
+      <button onclick="downloadSprite()">📥 下载雪碧图</button>
+      <button class="secondary" onclick="generateGIF()">🎬 生成并下载 GIF</button>
+    </div>
+
+    <div id="gifOutput" class="gif-output" style="display: none;">
+      <h3>生成的 GIF</h3>
+      <div id="gifContainer"></div>
+      <button onclick="downloadGIF()" style="margin-top: 15px;">📥 下载 GIF 文件</button>
+    </div>
+
+    <div class="info">
+      <p>📝 使用说明：</p>
+      <p>1. 调整帧间隔和重复次数</p>
+      <p>2. 点击"生成并下载 GIF"直接下载GIF文件</p>
+      <p>3. 或者先下载雪碧图，然后在网站工具页面上传测试</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.min.js"></script>
+  <script>
+    let generatedGIFBlob = null;
+
+    // 绘制像素风格小人
+    function drawCharacter(ctx, frame, x, y, size = 64) {
+      const pixelSize = size / 16;
+      const bodyColor = '#FF6B6B';
+      const faceColor = '#FFE66D';
+
+      const bounce = Math.sin(frame * Math.PI / 2) * 2;
+
+      // 身体
+      ctx.fillStyle = bodyColor;
+      ctx.fillRect(x + 4 * pixelSize, y + (5 + bounce) * pixelSize, 8 * pixelSize, 10 * pixelSize);
+
+      // 头部
+      ctx.fillStyle = faceColor;
+      ctx.fillRect(x + 5 * pixelSize, y + (1 + bounce) * pixelSize, 6 * pixelSize, 6 * pixelSize);
+
+      // 眼睛
+      ctx.fillStyle = '#333';
+      ctx.fillRect(x + 6 * pixelSize, y + (3 + bounce) * pixelSize, 1 * pixelSize, 1 * pixelSize);
+      ctx.fillRect(x + 9 * pixelSize, y + (3 + bounce) * pixelSize, 1 * pixelSize, 1 * pixelSize);
+
+      // 嘴巴
+      if (frame % 2 === 0) {
+        ctx.fillRect(x + 7 * pixelSize, y + (5 + bounce) * pixelSize, 2 * pixelSize, 1 * pixelSize);
+      } else {
+        ctx.fillRect(x + 7 * pixelSize, y + (5 + bounce) * pixelSize, 2 * pixelSize, 1 * pixelSize);
+        ctx.fillRect(x + 7 * pixelSize, y + (6 + bounce) * pixelSize, 2 * pixelSize, 1 * pixelSize);
+      }
+
+      // 手臂
+      ctx.fillStyle = bodyColor;
+      if (frame === 1 || frame === 3) {
+        ctx.fillRect(x + 2 * pixelSize, y + (6 + bounce) * pixelSize, 2 * pixelSize, 4 * pixelSize);
+        ctx.fillRect(x + 12 * pixelSize, y + (6 + bounce) * pixelSize, 2 * pixelSize, 4 * pixelSize);
+      } else {
+        ctx.fillRect(x + 2 * pixelSize, y + (8 + bounce) * pixelSize, 2 * pixelSize, 4 * pixelSize);
+        ctx.fillRect(x + 12 * pixelSize, y + (8 + bounce) * pixelSize, 2 * pixelSize, 4 * pixelSize);
+      }
+
+      // 脚
+      ctx.fillStyle = '#4ECDC4';
+      ctx.fillRect(x + 5 * pixelSize, y + (15 + bounce) * pixelSize, 2 * pixelSize, 1 * pixelSize);
+      ctx.fillRect(x + 9 * pixelSize, y + (15 + bounce) * pixelSize, 2 * pixelSize, 1 * pixelSize);
+    }
+
+    // 生成雪碧图
+    function generateSprite() {
+      const spriteCanvas = document.getElementById('spriteCanvas');
+      const spriteCtx = spriteCanvas.getContext('2d');
+
+      spriteCtx.fillStyle = '#87CEEB';
+      spriteCtx.fillRect(0, 0, 320, 64);
+
+      for (let frame = 0; frame < 5; frame++) {
+        drawCharacter(spriteCtx, frame, frame * 64, 0);
+        if (frame < 4) {
+          spriteCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+          spriteCtx.lineWidth = 1;
+          spriteCtx.beginPath();
+          spriteCtx.moveTo((frame + 1) * 64, 0);
+          spriteCtx.lineTo((frame + 1) * 64, 64);
+          spriteCtx.stroke();
+        }
+      }
+    }
+
+    // 动画预览
+    let currentFrame = 0;
+    function animatePreview() {
+      const previewCanvas = document.getElementById('previewCanvas');
+      const previewCtx = previewCanvas.getContext('2d');
+
+      previewCtx.fillStyle = '#87CEEB';
+      previewCtx.fillRect(0, 0, 64, 64);
+      drawCharacter(previewCtx, currentFrame, 0, 0);
+      currentFrame = (currentFrame + 1) % 5;
+      setTimeout(animatePreview, 200);
+    }
+
+    // 下载雪碧图
+    function downloadSprite() {
+      const canvas = document.getElementById('spriteCanvas');
+      const link = document.createElement('a');
+      link.download = 'test-sprite.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    // 生成GIF
+    function generateGIF() {
+      const duration = parseInt(document.getElementById('duration').value);
+      const loops = parseInt(document.getElementById('loops').value);
+
+      const gif = new GIF({
+        workers: 2,
+        quality: 10,
+        width: 64,
+        height: 64,
+        workerScript: 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js'
+      });
+
+      // 为每一帧创建临时canvas并添加到GIF
+      for (let frame = 0; frame < 5; frame++) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#87CEEB';
+        ctx.fillRect(0, 0, 64, 64);
+        drawCharacter(ctx, frame, 0, 0);
+
+        gif.addFrame(ctx, {
+          delay: duration,
+          copy: true
+        });
+      }
+
+      gif.on('finished', function(blob) {
+        generatedGIFBlob = blob;
+        const url = URL.createObjectURL(blob);
+
+        const gifContainer = document.getElementById('gifContainer');
+        gifContainer.innerHTML = '<img src="' + url + '" alt="Generated GIF">';
+
+        const gifOutput = document.getElementById('gifOutput');
+        gifOutput.style.display = 'block';
+
+        // 自动下载
+        downloadGIF();
+      });
+
+      gif.render();
+    }
+
+    // 下载GIF
+    function downloadGIF() {
+      if (!generatedGIFBlob) return;
+
+      const link = document.createElement('a');
+      link.download = 'animation.gif';
+      link.href = URL.createObjectURL(generatedGIFBlob);
+      link.click();
+    }
+
+    // 初始化
+    window.onload = function() {
+      generateSprite();
+      animatePreview();
+    };
+  </script>
+</body>
+</html>
