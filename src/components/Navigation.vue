@@ -9,6 +9,7 @@
         <router-link to="/" class="nav-link">首页</router-link>
         <router-link to="/blog" class="nav-link">博客</router-link>
         <router-link to="/gallery" class="nav-link">画廊</router-link>
+        <router-link to="/sprite-tool" class="nav-link">工具</router-link>
         <router-link to="/about" class="nav-link">关于</router-link>
       </div>
 
@@ -23,6 +24,7 @@
       <router-link to="/" @click="mobileMenuOpen = false">首页</router-link>
       <router-link to="/blog" @click="mobileMenuOpen = false">博客</router-link>
       <router-link to="/gallery" @click="mobileMenuOpen = false">画廊</router-link>
+      <router-link to="/sprite-tool" @click="mobileMenuOpen = false">工具</router-link>
       <router-link to="/about" @click="mobileMenuOpen = false">关于</router-link>
     </div>
   </nav>
