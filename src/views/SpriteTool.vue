@@ -76,14 +76,15 @@
           </div>
 
           <div class="config-item">
-            <label>总帧数</label>
+            <label>总帧数 (0=全部)</label>
             <input
               v-model.number="config.maxFrames"
               type="number"
-              min="1"
+              min="0"
               class="config-input"
               @input="updatePreview"
             />
+            <span class="hint">当前: {{ frames.length }} 帧</span>
           </div>
         </div>
 
@@ -162,7 +163,7 @@ const config = ref({
   frameWidth: 32,
   frameHeight: 32,
   duration: 100,
-  maxFrames: 100
+  maxFrames: 0
 })
 
 const frames = ref([])
@@ -267,7 +268,9 @@ const extractFrames = async () => {
 
   const cols = Math.floor(img.width / config.value.frameWidth)
   const rows = Math.floor(img.height / config.value.frameHeight)
-  const totalFrames = Math.min(cols * rows, config.value.maxFrames)
+  const totalFrames = config.value.maxFrames > 0
+    ? Math.min(cols * rows, config.value.maxFrames)
+    : cols * rows
 
   frames.value = []
 
@@ -565,6 +568,12 @@ section {
   font-size: 0.9rem;
   color: var(--浅青灰);
   font-weight: 200;
+}
+
+.config-item .hint {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin-top: 4px;
 }
 
 .config-input {
