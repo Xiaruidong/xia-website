@@ -99,8 +99,8 @@ const categories = ref([
 
 const galleryItems = ref([])
 
-onMounted(() => {
-  galleryItems.value = getGalleryItems()
+onMounted(async () => {
+  galleryItems.value = await getGalleryItems()
   window.addEventListener('keydown', handleKeydown)
 })
 

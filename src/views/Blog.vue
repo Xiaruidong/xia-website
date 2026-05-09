@@ -74,8 +74,8 @@ const categories = ref([
   { id: 'tech', name: '技术' }
 ])
 
-onMounted(() => {
-  posts.value = getPosts()
+onMounted(async () => {
+  posts.value = await getPosts()
 })
 
 const filteredPosts = computed(() => {

@@ -201,8 +201,8 @@ onMounted(() => {
   loadGallery()
 })
 
-const loadGallery = () => {
-  galleryItems.value = getGalleryItems()
+const loadGallery = async () => {
+  galleryItems.value = await getGalleryItems()
 }
 
 const openModal = () => {
@@ -275,7 +275,7 @@ const removeImage = () => {
   }
 }
 
-const saveItem = () => {
+const saveItem = async () => {
   if (!itemForm.value.title) {
     alert('请输入作品标题')
     return
@@ -298,20 +298,23 @@ const saveItem = () => {
     gradient: itemForm.value.gradient
   }
 
-  if (editingItem.value) {
-    updateGalleryItem(editingItem.value.id, data)
-  } else {
-    addGalleryItem(data)
+  try {
+    if (editingItem.value) {
+      await updateGalleryItem(editingItem.value.id, data)
+    } else {
+      await addGalleryItem(data)
+    }
+    await loadGallery()
+    closeModal()
+  } catch (error) {
+    alert('保存失败：' + error.message)
   }
-
-  loadGallery()
-  closeModal()
 }
 
-const confirmDelete = (item) => {
+const confirmDelete = async (item) => {
   if (confirm(`确定要删除《${item.title}》吗？`)) {
-    deleteGalleryItem(item.id)
-    loadGallery()
+    await deleteGalleryItem(item.id)
+    await loadGallery()
   }
 }
 

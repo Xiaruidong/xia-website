@@ -5,29 +5,36 @@ const STORAGE_KEYS = {
   AUTH: 'xia_auth_token'
 }
 
-// 获取数据
-export const getPosts = () => {
+// 存储模式配置：'local' | 'leancloud'
+const STORAGE_MODE = 'local' // 默认使用本地存储，配置 Leancloud 后改为 'leancloud'
+
+// 导入 Leancloud 存储
+import * as LCStorage from './storage-leancloud'
+
+// 本地存储函数
+const getPostsLocal = () => {
   const data = localStorage.getItem(STORAGE_KEYS.POSTS)
   return data ? JSON.parse(data) : []
 }
 
-export const getGalleryItems = () => {
+const getGalleryItemsLocal = () => {
   const data = localStorage.getItem(STORAGE_KEYS.GALLERY)
   return data ? JSON.parse(data) : []
 }
 
-// 保存数据
-export const savePosts = (posts) => {
+const savePosts = (posts) => {
   localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(posts))
 }
 
-export const saveGalleryItems = (items) => {
+const saveGalleryItems = (items) => {
   localStorage.setItem(STORAGE_KEYS.GALLERY, JSON.stringify(items))
 }
 
-// 文章操作
-export const addPost = (post) => {
-  const posts = getPosts()
+// 导出统一的接口
+export const getPosts = STORAGE_MODE === 'leancloud' ? LCStorage.getPosts : getPostsLocal
+export const getGalleryItems = STORAGE_MODE === 'leancloud' ? LCStorage.getGalleryItems : getGalleryItemsLocal
+export const addPost = STORAGE_MODE === 'leancloud' ? LCStorage.addPost : (post) => {
+  const posts = getPostsLocal()
   const newPost = {
     id: Date.now(),
     ...post,
@@ -38,8 +45,8 @@ export const addPost = (post) => {
   return newPost
 }
 
-export const updatePost = (id, updates) => {
-  const posts = getPosts()
+export const updatePost = STORAGE_MODE === 'leancloud' ? LCStorage.updatePost : (id, updates) => {
+  const posts = getPostsLocal()
   const index = posts.findIndex(p => p.id === id)
   if (index !== -1) {
     posts[index] = { ...posts[index], ...updates }
@@ -49,16 +56,15 @@ export const updatePost = (id, updates) => {
   return null
 }
 
-export const deletePost = (id) => {
-  const posts = getPosts()
+export const deletePost = STORAGE_MODE === 'leancloud' ? LCStorage.deletePost : (id) => {
+  const posts = getPostsLocal()
   const filtered = posts.filter(p => p.id !== id)
   savePosts(filtered)
   return filtered.length < posts.length
 }
 
-// 画廊操作
-export const addGalleryItem = (item) => {
-  const items = getGalleryItems()
+export const addGalleryItem = STORAGE_MODE === 'leancloud' ? LCStorage.addGalleryItem : (item) => {
+  const items = getGalleryItemsLocal()
   const newItem = {
     id: Date.now(),
     ...item,
@@ -69,8 +75,8 @@ export const addGalleryItem = (item) => {
   return newItem
 }
 
-export const updateGalleryItem = (id, updates) => {
-  const items = getGalleryItems()
+export const updateGalleryItem = STORAGE_MODE === 'leancloud' ? LCStorage.updateGalleryItem : (id, updates) => {
+  const items = getGalleryItemsLocal()
   const index = items.findIndex(i => i.id === id)
   if (index !== -1) {
     items[index] = { ...items[index], ...updates }
@@ -80,14 +86,14 @@ export const updateGalleryItem = (id, updates) => {
   return null
 }
 
-export const deleteGalleryItem = (id) => {
-  const items = getGalleryItems()
+export const deleteGalleryItem = STORAGE_MODE === 'leancloud' ? LCStorage.deleteGalleryItem : (id) => {
+  const items = getGalleryItemsLocal()
   const filtered = items.filter(i => i.id !== id)
   saveGalleryItems(filtered)
   return filtered.length < items.length
 }
 
-// 认证
+// 认证（始终使用 localStorage）
 export const login = (password) => {
   // 简单的密码验证，生产环境应该使用更安全的方式
   if (password === 'admin123') {
@@ -106,8 +112,8 @@ export const isAuthenticated = () => {
 }
 
 // 初始化示例数据
-export const initSampleData = () => {
-  if (getPosts().length === 0) {
+export const initSampleData = STORAGE_MODE === 'leancloud' ? LCStorage.initSampleData : () => {
+  if (getPostsLocal().length === 0) {
     const samplePosts = [
       {
         id: 1,
@@ -152,7 +158,7 @@ export const initSampleData = () => {
     savePosts(samplePosts)
   }
 
-  if (getGalleryItems().length === 0) {
+  if (getGalleryItemsLocal().length === 0) {
     const sampleGallery = [
       {
         id: 1,
@@ -182,3 +188,5 @@ export const initSampleData = () => {
     saveGalleryItems(sampleGallery)
   }
 }
+
+export { STORAGE_MODE }

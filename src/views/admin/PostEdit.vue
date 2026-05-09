@@ -132,9 +132,10 @@ const form = ref({
 
 const newTag = ref('')
 
-onMounted(() => {
+onMounted(async () => {
   if (isEdit.value) {
-    const post = getPosts().find(p => p.id === postId.value)
+    const posts = await getPosts()
+    const post = posts.find(p => p.id === postId.value)
     if (post) {
       form.value = {
         title: post.title,
@@ -196,7 +197,7 @@ const insertFormat = (type) => {
   textarea.focus()
 }
 
-const savePost = () => {
+const savePost = async () => {
   if (!form.value.title || !form.value.excerpt) {
     alert('请填写必填项')
     return
@@ -223,13 +224,16 @@ const savePost = () => {
     tags: form.value.tags
   }
 
-  if (isEdit.value) {
-    updatePost(postId.value, postData)
-  } else {
-    addPost(postData)
+  try {
+    if (isEdit.value) {
+      await updatePost(postId.value, postData)
+    } else {
+      await addPost(postData)
+    }
+    router.push('/admin/posts')
+  } catch (error) {
+    alert('保存失败：' + error.message)
   }
-
-  router.push('/admin/posts')
 }
 </script>
 

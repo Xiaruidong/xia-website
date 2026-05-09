@@ -48,18 +48,18 @@ onMounted(() => {
   loadPosts()
 })
 
-const loadPosts = () => {
-  posts.value = getPosts()
+const loadPosts = async () => {
+  posts.value = await getPosts()
 }
 
 const editPost = (id) => {
   router.push(`/admin/posts/${id}/edit`)
 }
 
-const confirmDelete = (post) => {
+const confirmDelete = async (post) => {
   if (confirm(`确定要删除《${post.title}》吗？`)) {
-    deletePost(post.id)
-    loadPosts()
+    await deletePost(post.id)
+    await loadPosts()
   }
 }
 </script>

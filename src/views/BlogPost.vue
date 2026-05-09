@@ -68,26 +68,30 @@ import { getPosts } from '../utils/storage'
 const route = useRoute()
 const postId = ref(parseInt(route.params.id))
 
-const allPosts = getPosts()
-const post = ref(allPosts.find(p => p.id === postId.value) || allPosts[0])
+const allPosts = ref([])
+const post = ref(null)
 
-const currentIndex = allPosts.findIndex(p => p.id === postId.value)
+const currentIndex = computed(() => {
+  return allPosts.value.findIndex(p => p.id === postId.value)
+})
 
 const prevPost = computed(() => {
-  if (currentIndex > 0) {
-    return allPosts[currentIndex - 1]
+  if (currentIndex.value > 0) {
+    return allPosts.value[currentIndex.value - 1]
   }
   return null
 })
 
 const nextPost = computed(() => {
-  if (currentIndex < allPosts.length - 1) {
-    return allPosts[currentIndex + 1]
+  if (currentIndex.value < allPosts.value.length - 1) {
+    return allPosts.value[currentIndex.value + 1]
   }
   return null
 })
 
-onMounted(() => {
+onMounted(async () => {
+  allPosts.value = await getPosts()
+  post.value = allPosts.value.find(p => p.id === postId.value) || allPosts.value[0]
   window.scrollTo(0, 0)
 })
 </script>
