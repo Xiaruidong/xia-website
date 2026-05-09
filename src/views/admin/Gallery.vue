@@ -144,10 +144,15 @@
               @change="handleImageUpload"
               class="file-input"
               ref="fileInputRef"
+              :disabled="uploadLoading"
             />
+            <div v-if="uploadLoading" class="upload-loading">
+              <span class="loading-spinner"></span>
+              <span>正在处理图片...</span>
+            </div>
             <div v-if="itemForm.image" class="upload-preview">
               <img :src="itemForm.image" />
-              <button type="button" @click="removeImage" class="remove-image">×</button>
+              <button type="button" @click="removeImage" class="remove-image" :disabled="uploadLoading">×</button>
             </div>
           </div>
 
@@ -169,6 +174,7 @@ const galleryItems = ref([])
 const showModal = ref(false)
 const editingItem = ref(null)
 const fileInputRef = ref(null)
+const uploadLoading = ref(false)
 
 const itemForm = ref({
   title: '',
@@ -252,20 +258,92 @@ const editItem = (item) => {
   showModal.value = true
 }
 
-const handleImageUpload = (event) => {
+const handleImageUpload = async (event) => {
   const file = event.target.files[0]
   if (!file) return
 
+  // 检查文件大小
   if (file.size > 2 * 1024 * 1024) {
     alert('图片大小不能超过 2MB')
     return
   }
 
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    itemForm.value.image = e.target.result
+  // 显示加载状态
+  const loadingItem = { file, loading: true }
+  uploadLoading.value = true
+
+  try {
+    // 压缩图片
+    const compressedBase64 = await compressImage(file)
+
+    itemForm.value.image = compressedBase64
+  } catch (error) {
+    console.error('图片处理失败:', error)
+    alert('图片上传失败：' + error.message)
+  } finally {
+    uploadLoading.value = false
   }
-  reader.readAsDataURL(file)
+}
+
+// 压缩图片函数
+const compressImage = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = (e) => {
+      const img = new Image()
+
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+
+        // 计算压缩后的尺寸
+        let width = img.width
+        let height = img.height
+        const maxDimension = 800
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = (height / width) * maxDimension
+            width = maxDimension
+          } else {
+            width = (width / height) * maxDimension
+            height = maxDimension
+          }
+        }
+
+        canvas.width = width
+        canvas.height = height
+
+        // 绘制压缩后的图片
+        ctx.drawImage(img, 0, 0, width, height)
+
+        // 转换为 Base64，使用 0.8 质量压缩
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8)
+
+        // 检查压缩后的大小
+        const compressedSize = Math.round((compressedBase64.length * 3) / 4)
+
+        if (compressedSize > 2 * 1024 * 1024) {
+          reject(new Error('压缩后图片仍然超过 2MB'))
+        } else {
+          resolve(compressedBase64)
+        }
+      }
+
+      img.onerror = () => {
+        reject(new Error('图片加载失败'))
+      }
+
+      img.src = e.target.result
+    }
+
+    reader.onerror = () => {
+      reject(new Error('文件读取失败'))
+    }
+
+    reader.readAsDataURL(file)
+  })
 }
 
 const removeImage = () => {
@@ -576,6 +654,33 @@ const isGIF = (item) => {
   max-height: 200px;
   object-fit: contain;
   border-radius: 10px;
+}
+
+.upload-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px;
+  background: var(--浅雾);
+  border-radius: 10px;
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: var(--浅青灰);
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--霜蓝);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .remove-image {

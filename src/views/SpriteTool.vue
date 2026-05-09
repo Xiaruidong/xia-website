@@ -28,11 +28,15 @@
           <div v-if="!spriteImage" class="upload-placeholder">
             <span class="upload-icon">📤</span>
             <span class="upload-text">点击或拖拽上传雪碧图</span>
-            <span class="upload-hint">支持 PNG、GIF 等格式</span>
+            <span class="upload-hint">支持 PNG、GIF 等格式，最大 5MB</span>
+          </div>
+          <div v-else-if="uploadLoading" class="upload-loading">
+            <span class="loading-spinner"></span>
+            <span>正在加载图片...</span>
           </div>
           <div v-else class="upload-preview">
             <img :src="spriteImage" />
-            <button @click.stop="clearImage" class="clear-btn">×</button>
+            <button @click.stop="clearImage" class="clear-btn" :disabled="uploadLoading">×</button>
           </div>
         </div>
       </section>
@@ -221,6 +225,7 @@ const generatedGIF = ref(null)
 const isGenerating = ref(false)
 const isDragOver = ref(false)
 const isPlaying = ref(false)
+const uploadLoading = ref(false)
 const previewCanvas = ref(null)
 const animationCanvas = ref(null)
 
@@ -284,18 +289,47 @@ const handleFileChange = (e) => {
 }
 
 const processFile = (file) => {
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    spriteImage.value = e.target.result
-
-    const img = new Image()
-    img.onload = async () => {
-      imageInfo.value = `${img.width} × ${img.height} px`
-      await detectFromImage()
-      extractFrames()
-    }
-    img.src = e.target.result
+  // 检查文件大小
+  if (file.size > 5 * 1024 * 1024) {
+    alert('图片大小不能超过 5MB')
+    return
   }
+
+  uploadLoading.value = true
+
+  const reader = new FileReader()
+
+  reader.onload = (e) => {
+    try {
+      spriteImage.value = e.target.result
+
+      const img = new Image()
+
+      img.onload = async () => {
+        imageInfo.value = `${img.width} × ${img.height} px`
+        await detectFromImage()
+        extractFrames()
+        uploadLoading.value = false
+      }
+
+      img.onerror = () => {
+        alert('图片加载失败')
+        uploadLoading.value = false
+      }
+
+      img.src = e.target.result
+    } catch (error) {
+      console.error('图片处理失败:', error)
+      alert('图片处理失败：' + error.message)
+      uploadLoading.value = false
+    }
+  }
+
+  reader.onerror = () => {
+    alert('文件读取失败')
+    uploadLoading.value = false
+  }
+
   reader.readAsDataURL(file)
 }
 
@@ -673,6 +707,29 @@ section {
   max-width: 100%;
   max-height: 400px;
   object-fit: contain;
+}
+
+.upload-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  color: var(--浅青灰);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--霜蓝);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .clear-btn {
