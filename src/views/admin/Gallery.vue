@@ -18,7 +18,9 @@
           <span v-else class="item-icon">{{ item.icon }}</span>
         </div>
         <div class="item-info">
-          <div class="item-type-badge">{{ item.type === 'image' ? '图片' : '图标' }}</div>
+          <div class="item-type-badge">
+            {{ item.type === 'image' ? (isGIF(item) ? 'GIF动图' : '图片') : '图标' }}
+          </div>
           <h3 class="item-title">{{ item.title }}</h3>
           <p class="item-description">{{ item.description }}</p>
           <div class="item-meta">
@@ -311,6 +313,10 @@ const confirmDelete = (item) => {
     deleteGalleryItem(item.id)
     loadGallery()
   }
+}
+
+const isGIF = (item) => {
+  return item.type === 'image' && item.image && item.image.includes('image/gif')
 }
 </script>
 

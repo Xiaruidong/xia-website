@@ -35,6 +35,9 @@
             <span v-else class="image-icon">{{ item.icon }}</span>
           </div>
           <div class="gallery-info">
+            <div class="item-badges">
+              <span v-if="item.type === 'image' && isGIF(item)" class="gif-badge">GIF</span>
+            </div>
             <h3 class="item-title">{{ item.title }}</h3>
             <p class="item-description">{{ item.description }}</p>
             <div class="item-meta">
@@ -162,6 +165,10 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
 })
+
+const isGIF = (item) => {
+  return item.type === 'image' && item.image && item.image.includes('image/gif')
+}
 </script>
 
 <style scoped>
@@ -281,6 +288,21 @@ onUnmounted(() => {
 
 .gallery-info {
   padding: 25px;
+}
+
+.item-badges {
+  margin-bottom: 10px;
+}
+
+.gif-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  color: white;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05rem;
 }
 
 .item-title {

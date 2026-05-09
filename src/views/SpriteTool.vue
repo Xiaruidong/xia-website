@@ -144,7 +144,64 @@
             <div v-if="generatedGIF" class="generated-gif">
               <h4>生成的 GIF</h4>
               <img :src="generatedGIF" class="generated-image" />
-              <button @click="downloadGIF" class="download-btn">下载 GIF</button>
+              <div class="gif-actions">
+                <button @click="downloadGIF" class="download-btn">下载 GIF</button>
+                <button @click="showSaveModal = true" class="save-btn">保存到画廊</button>
+              </div>
+            </div>
+
+            <!-- 保存到画廊弹窗 -->
+            <div v-if="showSaveModal" class="modal-overlay" @click.self="showSaveModal = false">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h3>保存到画廊</h3>
+                  <button @click="showSaveModal = false" class="modal-close">×</button>
+                </div>
+                <form @submit.prevent="saveToGallery" class="save-form">
+                  <div class="form-group">
+                    <label>标题 *</label>
+                    <input
+                      v-model="saveForm.title"
+                      type="text"
+                      placeholder="为你的动画起个名字"
+                      required
+                      class="form-input"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>描述</label>
+                    <textarea
+                      v-model="saveForm.description"
+                      placeholder="描述这个动画..."
+                      rows="3"
+                      class="form-textarea"
+                    ></textarea>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>分类</label>
+                      <select v-model="saveForm.categoryId" class="form-select">
+                        <option value="detail">细节</option>
+                        <option value="life">生活</option>
+                        <option value="winter">冬日</option>
+                        <option value="nature">自然</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label>日期</label>
+                      <input
+                        v-model="saveForm.date"
+                        type="date"
+                        class="form-input"
+                      />
+                    </div>
+                  </div>
+                  <div class="modal-actions">
+                    <button type="button" @click="showSaveModal = false" class="btn-cancel">取消</button>
+                    <button type="submit" class="btn-save">保存</button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         </div>
@@ -155,6 +212,7 @@
 
 <script setup>
 import { ref, computed, onUnmounted, nextTick } from 'vue'
+import { addGalleryItem } from '../utils/storage'
 
 const fileInput = ref(null)
 const spriteImage = ref(null)
@@ -177,6 +235,22 @@ const config = ref({
 })
 
 const frames = ref([])
+
+// 保存到画廊相关
+const showSaveModal = ref(false)
+const saveForm = ref({
+  title: '',
+  description: '',
+  categoryId: 'detail',
+  date: new Date().toISOString().split('T')[0]
+})
+
+const categoryMap = {
+  detail: '细节',
+  life: '生活',
+  winter: '冬日',
+  nature: '自然'
+}
 
 const frameCount = computed(() => {
   return frames.value.length
@@ -453,6 +527,36 @@ const downloadGIF = () => {
   link.download = 'sprite-animation.gif'
   link.href = generatedGIF.value
   link.click()
+}
+
+const saveToGallery = () => {
+  if (!generatedGIF.value || !saveForm.value.title) {
+    alert('请输入标题')
+    return
+  }
+
+  const data = {
+    title: saveForm.value.title,
+    description: saveForm.value.description,
+    category: categoryMap[saveForm.value.categoryId],
+    categoryId: saveForm.value.categoryId,
+    date: saveForm.value.date,
+    type: 'image',
+    image: generatedGIF.value
+  }
+
+  addGalleryItem(data)
+
+  // 重置表单并关闭弹窗
+  saveForm.value = {
+    title: '',
+    description: '',
+    categoryId: 'detail',
+    date: new Date().toISOString().split('T')[0]
+  }
+  showSaveModal.value = false
+
+  alert('已保存到画廊！可以在"画廊"页面查看')
 }
 
 onUnmounted(() => {
@@ -786,7 +890,8 @@ section {
   margin-bottom: 15px;
 }
 
-.download-btn {
+.download-btn,
+.save-btn {
   padding: 10px 25px;
   background: var(--浅青灰);
   color: var(--米白);
@@ -794,11 +899,152 @@ section {
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.3s ease;
+  font-size: 0.9rem;
 }
 
-.download-btn:hover {
+.download-btn:hover,
+.save-btn:hover {
   background: var(--text-dark);
   transform: translateY(-2px);
+}
+
+.save-btn {
+  background: var(--霜蓝);
+}
+
+.save-btn:hover {
+  background: var(--深霜蓝);
+}
+
+.gif-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Modal 样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--柔白);
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.modal-header h3 {
+  font-size: 1.3rem;
+  color: var(--浅青灰);
+  font-weight: 400;
+}
+
+.modal-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: var(--浅雾);
+  border-radius: 50%;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--浅青灰);
+  transition: all 0.3s ease;
+}
+
+.modal-close:hover {
+  background: var(--霜蓝);
+  color: var(--米白);
+}
+
+.save-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.save-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.save-form .form-group label {
+  font-size: 0.85rem;
+  color: var(--浅青灰);
+  font-weight: 200;
+}
+
+.save-form .form-input,
+.save-form .form-select,
+.save-form .form-textarea {
+  padding: 12px 16px;
+  border: 1px solid var(--霜蓝);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  background: white;
+  color: var(--text-dark);
+}
+
+.save-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.save-form .modal-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.save-form .btn-cancel,
+.save-form .btn-save {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.save-form .btn-cancel {
+  background: var(--浅雾);
+  color: var(--浅青灰);
+}
+
+.save-form .btn-save {
+  background: var(--浅青灰);
+  color: var(--米白);
+}
+
+.save-form .btn-cancel:hover {
+  background: var(--霜蓝);
+}
+
+.save-form .btn-save:hover {
+  background: var(--text-dark);
 }
 
 @media (max-width: 768px) {
