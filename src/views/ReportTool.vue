@@ -342,8 +342,9 @@
 import { ref, computed, onMounted } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// 配置 PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+// 配置 PDF.js worker - 使用 npm 包内的 worker
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 const fileInput = ref(null)
 const uploadedFile = ref(null)
