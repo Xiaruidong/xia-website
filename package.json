@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
     "gifshot": "^0.4.5",
-    "leancloud-storage": "^4.15.2",
     "vue": "^3.4.0",
     "vue-router": "^4.2.5"
   },

@@ -5,11 +5,11 @@ const STORAGE_KEYS = {
   AUTH: 'xia_auth_token'
 }
 
-// 存储模式配置：'local' | 'leancloud'
-const STORAGE_MODE = 'local' // 默认使用本地存储，配置 Leancloud 后改为 'leancloud'
+// 存储模式配置：'local' | 'supabase'
+const STORAGE_MODE = 'local' // 默认使用本地存储，配置 Supabase 后改为 'supabase'
 
-// 导入 Leancloud 存储
-import * as LCStorage from './storage-leancloud'
+// 导入 Supabase 存储
+import * as SupabaseStorage from './storage-supabase'
 
 // 本地存储函数
 const getPostsLocal = () => {
@@ -31,9 +31,9 @@ const saveGalleryItems = (items) => {
 }
 
 // 导出统一的接口
-export const getPosts = STORAGE_MODE === 'leancloud' ? LCStorage.getPosts : getPostsLocal
-export const getGalleryItems = STORAGE_MODE === 'leancloud' ? LCStorage.getGalleryItems : getGalleryItemsLocal
-export const addPost = STORAGE_MODE === 'leancloud' ? LCStorage.addPost : (post) => {
+export const getPosts = STORAGE_MODE === 'supabase' ? SupabaseStorage.getPosts : getPostsLocal
+export const getGalleryItems = STORAGE_MODE === 'supabase' ? SupabaseStorage.getGalleryItems : getGalleryItemsLocal
+export const addPost = STORAGE_MODE === 'supabase' ? SupabaseStorage.addPost : (post) => {
   const posts = getPostsLocal()
   const newPost = {
     id: Date.now(),
@@ -45,7 +45,7 @@ export const addPost = STORAGE_MODE === 'leancloud' ? LCStorage.addPost : (post)
   return newPost
 }
 
-export const updatePost = STORAGE_MODE === 'leancloud' ? LCStorage.updatePost : (id, updates) => {
+export const updatePost = STORAGE_MODE === 'supabase' ? SupabaseStorage.updatePost : (id, updates) => {
   const posts = getPostsLocal()
   const index = posts.findIndex(p => p.id === id)
   if (index !== -1) {
@@ -56,14 +56,14 @@ export const updatePost = STORAGE_MODE === 'leancloud' ? LCStorage.updatePost : 
   return null
 }
 
-export const deletePost = STORAGE_MODE === 'leancloud' ? LCStorage.deletePost : (id) => {
+export const deletePost = STORAGE_MODE === 'supabase' ? SupabaseStorage.deletePost : (id) => {
   const posts = getPostsLocal()
   const filtered = posts.filter(p => p.id !== id)
   savePosts(filtered)
   return filtered.length < posts.length
 }
 
-export const addGalleryItem = STORAGE_MODE === 'leancloud' ? LCStorage.addGalleryItem : (item) => {
+export const addGalleryItem = STORAGE_MODE === 'supabase' ? SupabaseStorage.addGalleryItem : (item) => {
   const items = getGalleryItemsLocal()
   const newItem = {
     id: Date.now(),
@@ -75,7 +75,7 @@ export const addGalleryItem = STORAGE_MODE === 'leancloud' ? LCStorage.addGaller
   return newItem
 }
 
-export const updateGalleryItem = STORAGE_MODE === 'leancloud' ? LCStorage.updateGalleryItem : (id, updates) => {
+export const updateGalleryItem = STORAGE_MODE === 'supabase' ? SupabaseStorage.updateGalleryItem : (id, updates) => {
   const items = getGalleryItemsLocal()
   const index = items.findIndex(i => i.id === id)
   if (index !== -1) {
@@ -86,7 +86,7 @@ export const updateGalleryItem = STORAGE_MODE === 'leancloud' ? LCStorage.update
   return null
 }
 
-export const deleteGalleryItem = STORAGE_MODE === 'leancloud' ? LCStorage.deleteGalleryItem : (id) => {
+export const deleteGalleryItem = STORAGE_MODE === 'supabase' ? SupabaseStorage.deleteGalleryItem : (id) => {
   const items = getGalleryItemsLocal()
   const filtered = items.filter(i => i.id !== id)
   saveGalleryItems(filtered)
@@ -112,7 +112,7 @@ export const isAuthenticated = () => {
 }
 
 // 初始化示例数据
-export const initSampleData = STORAGE_MODE === 'leancloud' ? LCStorage.initSampleData : () => {
+export const initSampleData = STORAGE_MODE === 'supabase' ? SupabaseStorage.initSampleData : () => {
   if (getPostsLocal().length === 0) {
     const samplePosts = [
       {

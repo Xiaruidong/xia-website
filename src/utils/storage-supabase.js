@@ -1,47 +1,75 @@
-// Leancloud 存储服务
-import { queryAll, queryById, createRecord, updateRecord, deleteRecord } from './leancloud'
+// Supabase 存储服务
+import { queryAll, createRecord, updateRecord, deleteRecord } from './supabase'
 
 // 数据转换函数
-const toPost = (avObject) => {
-  if (!avObject) return null
+const toPost = (record) => {
+  if (!record) return null
   return {
-    id: avObject.id,
-    title: avObject.get('title'),
-    excerpt: avObject.get('excerpt'),
-    content: avObject.get('content'),
-    category: avObject.get('category'),
-    categoryId: avObject.get('categoryId'),
-    date: avObject.get('date'),
-    readTime: avObject.get('readTime'),
-    views: avObject.get('views') || 0,
-    tags: avObject.get('tags') || [],
-    createdAt: avObject.get('createdAt')?.toISOString() || new Date().toISOString(),
-    updatedAt: avObject.get('updatedAt')?.toISOString() || new Date().toISOString()
+    id: record.id,
+    title: record.title,
+    excerpt: record.excerpt,
+    content: record.content,
+    category: record.category,
+    categoryId: record.category_id,
+    date: record.date,
+    readTime: record.read_time,
+    views: record.views || 0,
+    tags: record.tags || [],
+    createdAt: record.created_at || new Date().toISOString(),
+    updatedAt: record.updated_at || new Date().toISOString()
   }
 }
 
-const toGalleryItem = (avObject) => {
-  if (!avObject) return null
+const toGalleryItem = (record) => {
+  if (!record) return null
   return {
-    id: avObject.id,
-    title: avObject.get('title'),
-    description: avObject.get('description'),
-    category: avObject.get('category'),
-    categoryId: avObject.get('categoryId'),
-    date: avObject.get('date'),
-    type: avObject.get('type') || 'icon',
-    icon: avObject.get('icon'),
-    image: avObject.get('image'),
-    gradient: avObject.get('gradient'),
-    createdAt: avObject.get('createdAt')?.toISOString() || new Date().toISOString(),
-    updatedAt: avObject.get('updatedAt')?.toISOString() || new Date().toISOString()
+    id: record.id,
+    title: record.title,
+    description: record.description,
+    category: record.category,
+    categoryId: record.category_id,
+    date: record.date,
+    type: record.type || 'icon',
+    icon: record.icon,
+    image: record.image,
+    gradient: record.gradient,
+    createdAt: record.created_at || new Date().toISOString(),
+    updatedAt: record.updated_at || new Date().toISOString()
+  }
+}
+
+const fromPost = (post) => {
+  return {
+    title: post.title,
+    excerpt: post.excerpt,
+    content: post.content,
+    category: post.category,
+    category_id: post.categoryId,
+    date: post.date,
+    read_time: post.readTime,
+    views: post.views || 0,
+    tags: post.tags || []
+  }
+}
+
+const fromGalleryItem = (item) => {
+  return {
+    title: item.title,
+    description: item.description,
+    category: item.category,
+    category_id: item.categoryId,
+    date: item.date,
+    type: item.type || 'icon',
+    icon: item.icon,
+    image: item.image,
+    gradient: item.gradient
   }
 }
 
 // 获取数据
 export const getPosts = async () => {
   try {
-    const results = await queryAll('Post')
+    const results = await queryAll('posts')
     return results.map(toPost).filter(Boolean)
   } catch (error) {
     console.error('获取文章失败:', error)
@@ -51,7 +79,7 @@ export const getPosts = async () => {
 
 export const getGalleryItems = async () => {
   try {
-    const results = await queryAll('GalleryItem')
+    const results = await queryAll('gallery_items')
     return results.map(toGalleryItem).filter(Boolean)
   } catch (error) {
     console.error('获取画廊项目失败:', error)
@@ -62,12 +90,8 @@ export const getGalleryItems = async () => {
 // 文章操作
 export const addPost = async (post) => {
   try {
-    const data = {
-      ...post,
-      views: post.views || 0,
-      tags: post.tags || []
-    }
-    const result = await createRecord('Post', data)
+    const data = fromPost(post)
+    const result = await createRecord('posts', data)
     return toPost(result)
   } catch (error) {
     console.error('添加文章失败:', error)
@@ -77,7 +101,8 @@ export const addPost = async (post) => {
 
 export const updatePost = async (id, updates) => {
   try {
-    const result = await updateRecord('Post', id, updates)
+    const data = fromPost(updates)
+    const result = await updateRecord('posts', id, data)
     return toPost(result)
   } catch (error) {
     console.error('更新文章失败:', error)
@@ -87,7 +112,7 @@ export const updatePost = async (id, updates) => {
 
 export const deletePost = async (id) => {
   try {
-    await deleteRecord('Post', id)
+    await deleteRecord('posts', id)
     return true
   } catch (error) {
     console.error('删除文章失败:', error)
@@ -98,7 +123,8 @@ export const deletePost = async (id) => {
 // 画廊操作
 export const addGalleryItem = async (item) => {
   try {
-    const result = await createRecord('GalleryItem', item)
+    const data = fromGalleryItem(item)
+    const result = await createRecord('gallery_items', data)
     return toGalleryItem(result)
   } catch (error) {
     console.error('添加画廊项目失败:', error)
@@ -108,7 +134,8 @@ export const addGalleryItem = async (item) => {
 
 export const updateGalleryItem = async (id, updates) => {
   try {
-    const result = await updateRecord('GalleryItem', id, updates)
+    const data = fromGalleryItem(updates)
+    const result = await updateRecord('gallery_items', id, data)
     return toGalleryItem(result)
   } catch (error) {
     console.error('更新画廊项目失败:', error)
@@ -118,7 +145,7 @@ export const updateGalleryItem = async (id, updates) => {
 
 export const deleteGalleryItem = async (id) => {
   try {
-    await deleteRecord('GalleryItem', id)
+    await deleteRecord('gallery_items', id)
     return true
   } catch (error) {
     console.error('删除画廊项目失败:', error)
