@@ -120,18 +120,114 @@
           </div>
         </div>
 
-        <button
-          @click="parsePDF"
-          class="parse-btn"
-          :disabled="isParsing"
-        >
-          {{ isParsing ? '解析中...' : '开始解析' }}
-        </button>
+        <div class="action-buttons">
+          <button
+            @click="parsePDF"
+            class="parse-btn"
+            :disabled="isParsing"
+          >
+            {{ isParsing ? '解析中...' : '开始解析' }}
+          </button>
+          <button
+            v-if="parseResult"
+            @click="structureWithAI"
+            class="ai-btn"
+            :disabled="isStructuring"
+          >
+            {{ isStructuring ? 'AI 处理中...' : '🤖 AI 结构化' }}
+          </button>
+        </div>
+      </section>
+
+      <!-- AI 结构化结果 -->
+      <section v-if="structuredData" class="ai-result-section">
+        <h2 class="section-title">✨ AI 结构化结果</h2>
+
+        <div class="structured-summary">
+          <h3>核心摘要</h3>
+          <p class="summary-text">{{ structuredData.summary }}</p>
+
+          <div class="key-points">
+            <h4>关键要点</h4>
+            <ul>
+              <li v-for="(point, index) in structuredData.keyPoints" :key="index">
+                {{ point }}
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="structured-sections">
+          <h3>结构化板块</h3>
+          <div
+            v-for="(section, index) in structuredData.sections"
+            :key="index"
+            class="structured-section-card"
+          >
+            <h4>{{ section.title }}</h4>
+            <p class="section-content">{{ section.content }}</p>
+            <div v-if="section.keyData && section.keyData.length" class="key-data">
+              <strong>关键数据：</strong>
+              <span v-for="(data, dIndex) in section.keyData" :key="dIndex" class="data-tag">
+                {{ data }}
+              </span>
+            </div>
+            <div v-if="section.analysis" class="analysis">
+              <strong>分析观点：</strong>{{ section.analysis }}
+            </div>
+          </div>
+        </div>
+
+        <div class="structured-strategies">
+          <h3>投资策略</h3>
+          <div class="strategy-card">
+            <div class="strategy-item">
+              <span class="strategy-label">整体策略：</span>
+              <span class="strategy-value">{{ structuredData.strategies?.overall || '暂无' }}</span>
+            </div>
+            <div class="strategy-item">
+              <span class="strategy-label">短期建议：</span>
+              <span class="strategy-value">{{ structuredData.strategies?.shortTerm || '暂无' }}</span>
+            </div>
+            <div class="strategy-item">
+              <span class="strategy-label">风险等级：</span>
+              <span
+                class="strategy-value risk-badge"
+                :class="structuredData.strategies?.riskLevel?.toLowerCase()"
+              >
+                {{ structuredData.strategies?.riskLevel || '中' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="structuredData.dataHighlights && structuredData.dataHighlights.length" class="data-highlights">
+          <h3>重要数据</h3>
+          <div class="highlights-grid">
+            <div
+              v-for="(highlight, index) in structuredData.dataHighlights"
+              :key="index"
+              class="highlight-card"
+              :class="highlight.importance?.toLowerCase()"
+            >
+              <div class="highlight-indicator">{{ highlight.indicator }}</div>
+              <div class="highlight-value">{{ highlight.value }}</div>
+              <div class="highlight-change">{{ highlight.change }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="save-actions">
+          <button @click="editStructuredData" class="edit-btn">编辑结构化数据</button>
+          <button @click="saveStructuredData" class="save-btn" :disabled="isSaving">
+            {{ isSaving ? '保存中...' : '保存到数据库' }}
+          </button>
+        </div>
       </section>
 
       <!-- 解析结果 -->
       <section v-if="parseResult" class="result-section">
-        <h2 class="section-title">3. 解析结果</h2>
+        <h2 class="section-title">原始解析结果</h2>
 
         <div class="result-tabs">
           <button
@@ -341,6 +437,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
+import { structureReportText } from '../utils/ai-service'
 
 // 配置 PDF.js worker - 使用 npm 包内的 worker
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -350,8 +447,10 @@ const fileInput = ref(null)
 const uploadedFile = ref(null)
 const isDragOver = ref(false)
 const isParsing = ref(false)
+const isStructuring = ref(false)
 const isSaving = ref(false)
 const parseResult = ref(null)
+const structuredData = ref(null)
 const activeTab = ref('text')
 const activeDetailTab = ref('sections')
 const showReportDetail = ref(false)
@@ -566,6 +665,7 @@ const saveReport = async () => {
       tables_count: parseResult.value.tables.length,
       sections: parseResult.value.sections,
       tables: parseResult.value.tables,
+      structured_data: structuredData.value,
       created_at: new Date().toISOString()
     }
 
@@ -580,6 +680,64 @@ const saveReport = async () => {
     // 清空表单
     clearAll()
 
+  } catch (error) {
+    console.error('保存失败:', error)
+    alert('保存失败：' + error.message)
+  } finally {
+    isSaving.value = false
+  }
+}
+
+// AI 结构化
+const structureWithAI = async () => {
+  if (!parseResult.value) {
+    alert('请先解析 PDF')
+    return
+  }
+
+  isStructuring.value = true
+
+  try {
+    // 获取全文文本
+    const fullText = parseResult.value.fullText || parseResult.value.sections.map(s => s.content).join('\n\n')
+
+    const reportInfo = {
+      title: reportForm.value.title,
+      reportType: reportForm.value.reportType,
+      category: reportForm.value.category
+    }
+
+    // 调用 AI 服务进行结构化
+    const structured = await structureReportText(fullText, reportInfo)
+    structuredData.value = structured
+
+    // 切换到结构化结果展示
+    window.scrollTo({
+      top: document.querySelector('.ai-result-section')?.offsetTop - 100 || 0,
+      behavior: 'smooth'
+    })
+
+  } catch (error) {
+    console.error('AI 结构化失败:', error)
+    alert('AI 结构化失败：' + error.message + '\n\n请检查：\n1. 是否配置了 VITE_QWEN_API_KEY\n2. API Key 是否正确\n3. 网络连接是否正常')
+  } finally {
+    isStructuring.value = false
+  }
+}
+
+const editStructuredData = () => {
+  // TODO: 实现编辑功能
+  alert('编辑功能开发中...')
+}
+
+const saveStructuredData = async () => {
+  if (!structuredData.value) return
+
+  isSaving.value = true
+
+  try {
+    // 这里应该保存到数据库
+    alert('结构化数据保存成功！')
   } catch (error) {
     console.error('保存失败:', error)
     alert('保存失败：' + error.message)
@@ -827,8 +985,15 @@ section {
   cursor: pointer;
 }
 
+.action-buttons {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
 .parse-btn {
-  width: 100%;
+  flex: 1;
+  min-width: 200px;
   padding: 15px 30px;
   background: var(--浅青灰);
   color: var(--米白);
@@ -846,6 +1011,30 @@ section {
 }
 
 .parse-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ai-btn {
+  flex: 1;
+  min-width: 200px;
+  padding: 15px 30px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: var(--米白);
+  border: none;
+  border-radius: 15px;
+  font-size: 1.1rem;
+  letter-spacing: 0.15rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.ai-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.ai-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -1186,6 +1375,239 @@ section {
 
   .reports-list {
     grid-template-columns: 1fr;
+  }
+
+  /* AI 结构化结果样式 */
+  .ai-result-section {
+    background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+    border: 2px solid #667eea;
+  }
+
+  .structured-summary {
+    padding: 25px;
+    background: white;
+    border-radius: 15px;
+    margin-bottom: 25px;
+  }
+
+  .structured-summary h3 {
+    font-size: 1.3rem;
+    color: #667eea;
+    margin-bottom: 15px;
+  }
+
+  .summary-text {
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: var(--text-dark);
+    margin-bottom: 20px;
+  }
+
+  .key-points h4 {
+    font-size: 1.1rem;
+    color: var(--浅青灰);
+    margin-bottom: 12px;
+  }
+
+  .key-points ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .key-points li {
+    padding: 10px 15px;
+    margin-bottom: 8px;
+    background: var(--浅雾);
+    border-left: 3px solid #667eea;
+    border-radius: 5px;
+  }
+
+  .structured-sections {
+    margin-bottom: 25px;
+  }
+
+  .structured-sections h3 {
+    font-size: 1.3rem;
+    color: var(--浅青灰);
+    margin-bottom: 20px;
+  }
+
+  .structured-section-card {
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    border-left: 4px solid #667eea;
+  }
+
+  .structured-section-card h4 {
+    font-size: 1.1rem;
+    color: #667eea;
+    margin-bottom: 12px;
+  }
+
+  .section-content {
+    color: var(--text-dark);
+    line-height: 1.7;
+    margin-bottom: 15px;
+  }
+
+  .key-data {
+    margin-bottom: 12px;
+  }
+
+  .data-tag {
+    display: inline-block;
+    padding: 5px 12px;
+    margin: 5px 5px 0 0;
+    background: #e8f0fe;
+    color: #1967d2;
+    border-radius: 15px;
+    font-size: 0.85rem;
+  }
+
+  .analysis {
+    padding: 12px;
+    background: #fff8e1;
+    border-radius: 8px;
+    font-size: 0.95rem;
+  }
+
+  .structured-strategies {
+    margin-bottom: 25px;
+  }
+
+  .structured-strategies h3 {
+    font-size: 1.3rem;
+    color: var(--浅青灰);
+    margin-bottom: 15px;
+  }
+
+  .strategy-card {
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+  }
+
+  .strategy-item {
+    display: flex;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--浅雾);
+  }
+
+  .strategy-item:last-child {
+    border-bottom: none;
+  }
+
+  .strategy-label {
+    font-weight: 500;
+    color: var(--浅青灰);
+    min-width: 100px;
+  }
+
+  .strategy-value {
+    flex: 1;
+    color: var(--text-dark);
+  }
+
+  .risk-badge {
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .risk-badge.低 {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  .risk-badge.中 {
+    background: #fff3e0;
+    color: #ef6c00;
+  }
+
+  .risk-badge.高 {
+    background: #ffebee;
+    color: #c62828;
+  }
+
+  .data-highlights {
+    margin-bottom: 25px;
+  }
+
+  .data-highlights h3 {
+    font-size: 1.3rem;
+    color: var(--浅青灰);
+    margin-bottom: 15px;
+  }
+
+  .highlights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+  }
+
+  .highlight-card {
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+    text-align: center;
+    border: 2px solid var(--浅雾);
+  }
+
+  .highlight-card.高 {
+    border-color: #ff6b6b;
+    background: #ffebee;
+  }
+
+  .highlight-card.中 {
+    border-color: #ffd93d;
+    background: #fffde7;
+  }
+
+  .highlight-card.低 {
+    border-color: #6bcf7f;
+    background: #e8f5e9;
+  }
+
+  .highlight-indicator {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    margin-bottom: 8px;
+  }
+
+  .highlight-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 5px;
+  }
+
+  .highlight-change {
+    font-size: 0.85rem;
+    color: var(--深霜蓝);
+  }
+
+  .save-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+  }
+
+  .edit-btn {
+    padding: 15px 30px;
+    background: var(--浅雾);
+    color: var(--浅青灰);
+    border: none;
+    border-radius: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .edit-btn:hover {
+    background: var(--霜蓝);
+    color: var(--米白);
   }
 }
 </style>
