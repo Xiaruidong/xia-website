@@ -9,7 +9,13 @@
         <router-link to="/" class="nav-link">首页</router-link>
         <router-link to="/blog" class="nav-link">博客</router-link>
         <router-link to="/gallery" class="nav-link">画廊</router-link>
-        <router-link to="/sprite-tool" class="nav-link">工具</router-link>
+        <div class="nav-dropdown" @mouseenter="showToolsMenu = true" @mouseleave="showToolsMenu = false">
+          <span class="nav-link">工具</span>
+          <div class="dropdown-menu" :class="{ 'show': showToolsMenu }">
+            <router-link to="/sprite-tool" class="dropdown-item">雪碧图工具</router-link>
+            <router-link to="/report-tool" class="dropdown-item">研报解析</router-link>
+          </div>
+        </div>
         <router-link to="/about" class="nav-link">关于</router-link>
       </div>
 
@@ -24,7 +30,8 @@
       <router-link to="/" @click="mobileMenuOpen = false">首页</router-link>
       <router-link to="/blog" @click="mobileMenuOpen = false">博客</router-link>
       <router-link to="/gallery" @click="mobileMenuOpen = false">画廊</router-link>
-      <router-link to="/sprite-tool" @click="mobileMenuOpen = false">工具</router-link>
+      <router-link to="/sprite-tool" @click="mobileMenuOpen = false">雪碧图工具</router-link>
+      <router-link to="/report-tool" @click="mobileMenuOpen = false">研报解析</router-link>
       <router-link to="/about" @click="mobileMenuOpen = false">关于</router-link>
     </div>
   </nav>
@@ -35,6 +42,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 
 const isScrolled = ref(false)
 const mobileMenuOpen = ref(false)
+const showToolsMenu = ref(false)
 
 const handleScroll = () => {
   isScrolled.value = window.scrollY > 50
@@ -122,6 +130,57 @@ onUnmounted(() => {
 .nav-link:hover::after,
 .nav-link.router-link-active::after {
   width: 100%;
+}
+
+/* 下拉菜单 */
+.nav-dropdown {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.nav-dropdown .nav-link {
+  cursor: pointer;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--柔白);
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(200, 217, 230, 0.3);
+  min-width: 150px;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  padding: 10px 0;
+}
+
+.dropdown-menu.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.dropdown-item {
+  display: block;
+  padding: 12px 20px;
+  color: var(--浅青灰);
+  text-decoration: none;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.dropdown-item:hover {
+  background: var(--浅雾);
+  color: var(--深霜蓝);
+}
+
+.dropdown-item.router-link-active {
+  background: var(--浅雾);
+  color: var(--深霜蓝);
 }
 
 .mobile-toggle {

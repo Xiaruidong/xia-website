@@ -6,6 +6,7 @@ import BlogPost from '../views/BlogPost.vue'
 import Gallery from '../views/Gallery.vue'
 import About from '../views/About.vue'
 import SpriteTool from '../views/SpriteTool.vue'
+import ReportTool from '../views/ReportTool.vue'
 import AdminLogin from '../views/admin/Login.vue'
 import AdminDashboard from '../views/admin/Dashboard.vue'
 import AdminPosts from '../views/admin/Posts.vue'
@@ -42,6 +43,11 @@ const routes = [
     path: '/sprite-tool',
     name: 'SpriteTool',
     component: SpriteTool
+  },
+  {
+    path: '/report-tool',
+    name: 'ReportTool',
+    component: ReportTool
   },
   {
     path: '/admin',
