@@ -456,8 +456,8 @@ const updatePreview = async () => {
   canvas.width = maxCols * (cellSize + 5)
   canvas.height = previewRows * (cellSize + 5)
 
-  ctx.fillStyle = '#f5f5f5'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  // 使用棋盘格背景显示透明效果
+  drawCheckerboard(ctx, canvas.width, canvas.height)
 
   // 预加载所有图片后再统一绘制
   const loadImage = (src) => new Promise((resolve) => {
@@ -475,6 +475,21 @@ const updatePreview = async () => {
     const row = Math.floor(index / maxCols)
     ctx.drawImage(img, col * (cellSize + 5), row * (cellSize + 5), cellSize, cellSize)
   })
+}
+
+// 绘制棋盘格背景（用于显示透明效果）
+const drawCheckerboard = (ctx, width, height) => {
+  const checkerSize = 10
+  const color1 = '#ffffff'
+  const color2 = '#e0e0e0'
+
+  for (let y = 0; y < height; y += checkerSize) {
+    for (let x = 0; x < width; x += checkerSize) {
+      const useColor1 = ((Math.floor(x / checkerSize) + Math.floor(y / checkerSize)) % 2) === 0
+      ctx.fillStyle = useColor1 ? color1 : color2
+      ctx.fillRect(x, y, checkerSize, checkerSize)
+    }
+  }
 }
 
 const previewAnimation = () => {
@@ -496,11 +511,29 @@ const startAnimation = () => {
   const canvas = animationCanvas.value
   const ctx = canvas.getContext('2d')
 
+  // 初始化画布背景
+  const initCanvas = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    drawCheckerboard(ctx, canvas.width, canvas.height)
+  }
+
+  initCanvas()
+
   const animate = () => {
     const img = new Image()
     img.onload = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      ctx.drawImage(img, 0, 0)
+      // 完全清除画布并重绘背景
+      initCanvas()
+
+      // 绘制当前帧
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+      currentFrame = (currentFrame + 1) % frames.value.length
+      animationInterval = setTimeout(animate, config.value.duration)
+    }
+    img.onerror = () => {
+      // 图片加载失败时继续下一帧
+      console.error('帧加载失败:', currentFrame)
       currentFrame = (currentFrame + 1) % frames.value.length
       animationInterval = setTimeout(animate, config.value.duration)
     }
@@ -515,6 +548,23 @@ const stopAnimation = () => {
   if (animationInterval) {
     clearTimeout(animationInterval)
     animationInterval = null
+  }
+
+  // 停止时显示第一帧
+  if (animationCanvas.value && frames.value.length > 0) {
+    const canvas = animationCanvas.value
+    const ctx = canvas.getContext('2d')
+
+    // 重绘背景
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    drawCheckerboard(ctx, canvas.width, canvas.height)
+
+    // 加载并显示第一帧
+    const img = new Image()
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    }
+    img.src = frames.value[0]
   }
 }
 
@@ -907,15 +957,32 @@ section {
   height: auto;
   border: 1px solid var(--浅雾);
   border-radius: 10px;
+  /* 使用 CSS 棋盘格背景显示透明效果 */
+  background-image:
+    linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+    linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  background-color: #ffffff;
 }
 
 .animation-canvas {
   border: 1px solid var(--浅雾);
   border-radius: 10px;
-  background: var(--浅雾);
   margin: 0 auto;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  /* 使用 CSS 棋盘格背景作为备用 */
+  background-image:
+    linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+    linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  background-color: #ffffff;
 }
 
 .frames-preview {
