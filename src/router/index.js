@@ -7,6 +7,7 @@ import Gallery from '../views/Gallery.vue'
 import About from '../views/About.vue'
 import SpriteTool from '../views/SpriteTool.vue'
 import ReportTool from '../views/ReportTool.vue'
+import PixelGame from '../views/PixelGame.vue'
 import AdminLogin from '../views/admin/Login.vue'
 import AdminDashboard from '../views/admin/Dashboard.vue'
 import AdminPosts from '../views/admin/Posts.vue'
@@ -48,6 +49,11 @@ const routes = [
     path: '/report-tool',
     name: 'ReportTool',
     component: ReportTool
+  },
+  {
+    path: '/pixel-game',
+    name: 'PixelGame',
+    component: PixelGame
   },
   {
     path: '/admin',
