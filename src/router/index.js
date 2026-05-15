@@ -8,6 +8,7 @@ import About from '../views/About.vue'
 import SpriteTool from '../views/SpriteTool.vue'
 import ReportTool from '../views/ReportTool.vue'
 import PixelGame from '../views/PixelGame.vue'
+import JobCrawler from '../views/JobCrawler.vue'
 import AdminLogin from '../views/admin/Login.vue'
 import AdminDashboard from '../views/admin/Dashboard.vue'
 import AdminPosts from '../views/admin/Posts.vue'
@@ -54,6 +55,11 @@ const routes = [
     path: '/pixel-game',
     name: 'PixelGame',
     component: PixelGame
+  },
+  {
+    path: '/job-crawler',
+    name: 'JobCrawler',
+    component: JobCrawler
   },
   {
     path: '/admin',

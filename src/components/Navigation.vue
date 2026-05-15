@@ -15,6 +15,7 @@
             <router-link to="/sprite-tool" class="dropdown-item">雪碧图工具</router-link>
             <router-link to="/report-tool" class="dropdown-item">研报解析</router-link>
             <router-link to="/pixel-game" class="dropdown-item">像素游戏</router-link>
+            <router-link to="/job-crawler" class="dropdown-item">招聘爬虫</router-link>
           </div>
         </div>
         <router-link to="/about" class="nav-link">关于</router-link>
@@ -34,6 +35,7 @@
       <router-link to="/sprite-tool" @click="mobileMenuOpen = false">雪碧图工具</router-link>
       <router-link to="/report-tool" @click="mobileMenuOpen = false">研报解析</router-link>
       <router-link to="/pixel-game" @click="mobileMenuOpen = false">像素游戏</router-link>
+      <router-link to="/job-crawler" @click="mobileMenuOpen = false">招聘爬虫</router-link>
       <router-link to="/about" @click="mobileMenuOpen = false">关于</router-link>
     </div>
   </nav>
