@@ -1,7 +1,0 @@
-fastapi
-uvicorn[standard]
-python-multipart
-aiohttp
-beautifulsoup4
-openpyxl
-pydantic

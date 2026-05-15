@@ -35,21 +35,6 @@
             </div>
           </div>
         </div>
-
-        <div class="game-stats">
-          <div class="stat-item">
-            <span class="stat-label">分数：</span>
-            <span class="stat-value">{{ gameStats.score }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">生命：</span>
-            <span class="stat-value">{{ gameStats.lives }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">收集：</span>
-            <span class="stat-value">{{ gameStats.collected }} / {{ gameStats.totalItems }}</span>
-          </div>
-        </div>
       </section>
 
       <!-- 游戏画布 -->
@@ -60,15 +45,6 @@
           :width="canvasWidth"
           :height="canvasHeight"
         ></canvas>
-
-        <!-- 游戏结束弹窗 -->
-        <div v-if="showGameOver" class="game-over-overlay">
-          <div class="game-over-content">
-            <h2>游戏结束</h2>
-            <p class="final-score">最终分数：{{ gameStats.score }}</p>
-            <button @click="restartGame" class="restart-btn">再玩一次</button>
-          </div>
-        </div>
       </section>
 
       <!-- 资源选择 -->
@@ -98,8 +74,8 @@
             >
               <canvas
                 :ref="el => char.previewRef = el"
-                :width="64"
-                :height="64"
+                :width="96"
+                :height="144"
                 class="resource-preview"
               ></canvas>
               <span class="resource-name">{{ char.name }}</span>
@@ -119,23 +95,6 @@
               <span class="resource-name">{{ scene.name }}</span>
             </div>
           </div>
-
-          <!-- 道具选择 -->
-          <div v-if="activeResourceTab === 'items'" class="resource-list">
-            <div
-              v-for="item in collectibleItems"
-              :key="item.id"
-              class="resource-item"
-            >
-              <canvas
-                :ref="el => item.previewRef = el"
-                :width="32"
-                :height="32"
-                class="resource-preview small"
-              ></canvas>
-              <span class="resource-name">{{ item.name }}</span>
-            </div>
-          </div>
         </div>
       </section>
     </div>
@@ -150,7 +109,7 @@ const isPlaying = ref(false)
 const isPaused = ref(false)
 const showGameOver = ref(false)
 
-const canvasWidth = 800
+const canvasWidth = 1200
 const canvasHeight = 480
 
 // 游戏统计
@@ -170,8 +129,8 @@ let lastTime = 0
 const player = ref({
   x: 100,
   y: 300,
-  width: 32,
-  height: 32,
+  width: 96,
+  height: 144,
   speed: 200,
   vx: 0,
   vy: 0,
@@ -192,81 +151,153 @@ const keys = {
 // 资源标签
 const resourceTabs = [
   { id: 'characters', name: '角色' },
-  { id: 'scenes', name: '场景' },
-  { id: 'items', name: '道具' }
+  { id: 'scenes', name: '场景' }
 ]
 
 const activeResourceTab = ref('characters')
 const selectedCharacter = ref(null)
 const selectedScene = ref(null)
 
+// 精灵图角色
+const spriteWalkImage = ref(null)
+const spriteWalkImgObj = ref(null)
+
 // 角色数据
 const characters = ref([
   {
     id: 1,
-    name: '冒险者',
+    name: '精灵图角色',
     color: '#FF6B6B',
-    // 简单像素风格角色绘制函数
+    // 使用精灵图绘制角色
     draw: (ctx, x, y, frame, direction) => {
-      const w = 32
-      const h = 32
+      if (!spriteWalkImgObj.value) {
+        // 如果图片还没加载，显示占位符
+        ctx.fillStyle = '#FF6B6B'
+        ctx.fillRect(x, y, 96, 144)
+        ctx.fillStyle = '#FFF'
+        ctx.font = '10px Arial'
+        ctx.fillText('加载中...', x + 2, y + 72)
+        return
+      }
 
-      // 身体
-      ctx.fillStyle = '#FF6B6B'
-      ctx.fillRect(x + 8, y + 12, 16, 14)
+      // 精灵图信息：128x193，4x4网格，每帧32x48
+      const frameWidth = 32
+      const frameHeight = 48
+      const totalCols = 4
+      const scale = 3 // 放大3倍
 
-      // 头
-      ctx.fillStyle = '#FFE66D'
-      ctx.fillRect(x + 10, y + 2, 12, 10)
+      // 根据方向选择起始帧
+      // 第1列：向下(0,1,2,3)，第2列：向左(4,5,6,7)，第3列：向右(8,9,10,11)，第4列：向上(12,13,14,15)
+      let startFrame = 0
+      switch (direction) {
+        case 'down':
+          startFrame = 0
+          break
+        case 'left':
+          startFrame = 4
+          break
+        case 'right':
+          startFrame = 8
+          break
+        case 'up':
+          startFrame = 12
+          break
+        default:
+          startFrame = 0
+      }
 
-      // 眼睛
-      ctx.fillStyle = '#333'
-      ctx.fillRect(x + 12, y + 5, 3, 3)
-      ctx.fillRect(x + 17, y + 5, 3, 3)
+      // 计算当前动画帧（0-3循环）
+      const currentAnimFrame = frame % 4
+      const spriteIndex = startFrame + currentAnimFrame
 
-      // 腿
-      ctx.fillStyle = '#4ECDC4'
-      const legOffset = Math.sin(frame * 0.3) * 3
-      ctx.fillRect(x + 10, y + 26 + legOffset, 5, 6)
-      ctx.fillRect(x + 17, y + 26 - legOffset, 5, 6)
+      // 计算在精灵图中的位置
+      const spriteCol = spriteIndex % totalCols
+      const spriteRow = Math.floor(spriteIndex / totalCols)
 
-      // 手
-      ctx.fillStyle = '#FF6B6B'
-      ctx.fillRect(x + 4, y + 16, 4, 8)
-      ctx.fillRect(x + 24, y + 16, 4, 8)
+      const srcX = spriteCol * frameWidth
+      const srcY = spriteRow * frameHeight
+
+      // 绘制精灵图帧（放大3倍）
+      ctx.imageSmoothingEnabled = false // 保持像素风格
+      ctx.drawImage(
+        spriteWalkImgObj.value,
+        srcX, srcY, frameWidth, frameHeight,
+        x, y, frameWidth * scale, frameHeight * scale
+      )
     }
   },
   {
     id: 2,
-    name: '魔法师',
-    color: '#A8E6CF',
+    name: '冒险者',
+    color: '#FF6B6B',
+    // 简单像素风格角色绘制函数
     draw: (ctx, x, y, frame, direction) => {
-      const w = 32
+      const scale = 3
+      const w = 32 * scale
+      const h = 48 * scale
 
-      // 长袍
-      ctx.fillStyle = '#A8E6CF'
-      ctx.fillRect(x + 6, y + 10, 20, 18)
+      // 身体
+      ctx.fillStyle = '#FF6B6B'
+      ctx.fillRect(x + 8 * scale, y + 12 * scale, 16 * scale, 14 * scale)
 
-      // 帽子
-      ctx.fillStyle = '#6BCF7F'
-      ctx.fillRect(x + 8, y + 2, 16, 10)
+      // 头
+      ctx.fillStyle = '#FFE66D'
+      ctx.fillRect(x + 10 * scale, y + 2 * scale, 12 * scale, 10 * scale)
 
       // 眼睛
       ctx.fillStyle = '#333'
-      ctx.fillRect(x + 12, y + 5, 3, 3)
-      ctx.fillRect(x + 17, y + 5, 3, 3)
+      ctx.fillRect(x + 12 * scale, y + 5 * scale, 3 * scale, 3 * scale)
+      ctx.fillRect(x + 17 * scale, y + 5 * scale, 3 * scale, 3 * scale)
+
+      // 腿
+      ctx.fillStyle = '#4ECDC4'
+      const legOffset = Math.sin(frame * 0.3) * 3 * scale
+      ctx.fillRect(x + 10 * scale, y + 26 * scale + legOffset, 5 * scale, 6 * scale)
+      ctx.fillRect(x + 17 * scale, y + 26 * scale - legOffset, 5 * scale, 6 * scale)
+
+      // 手
+      ctx.fillStyle = '#FF6B6B'
+      ctx.fillRect(x + 4 * scale, y + 16 * scale, 4 * scale, 8 * scale)
+      ctx.fillRect(x + 24 * scale, y + 16 * scale, 4 * scale, 8 * scale)
+    }
+  },
+  {
+    id: 3,
+    name: '魔法师',
+    color: '#A8E6CF',
+    draw: (ctx, x, y, frame, direction) => {
+      const scale = 3
+      const w = 32 * scale
+      const h = 48 * scale
+
+      // 长袍
+      ctx.fillStyle = '#A8E6CF'
+      ctx.fillRect(x + 6 * scale, y + 10 * scale, 20 * scale, 30 * scale)
+
+      // 帽子
+      ctx.fillStyle = '#6BCF7F'
+      ctx.fillRect(x + 8 * scale, y + 2 * scale, 16 * scale, 10 * scale)
+
+      // 眼睛
+      ctx.fillStyle = '#333'
+      ctx.fillRect(x + 12 * scale, y + 5 * scale, 3 * scale, 3 * scale)
+      ctx.fillRect(x + 17 * scale, y + 5 * scale, 3 * scale, 3 * scale)
 
       // 魔法效果
       const magicGlow = Math.sin(frame * 0.5) * 0.3 + 0.7
       ctx.fillStyle = `rgba(255, 230, 109, ${magicGlow})`
       ctx.beginPath()
-      ctx.arc(x + 16, y + 16, 8, 0, Math.PI * 2)
+      ctx.arc(x + 16 * scale, y + 24 * scale, 8 * scale, 0, Math.PI * 2)
       ctx.fill()
     }
   }
 ])
 
 // 场景数据
+// 自定义背景图片
+const customBackgroundImage = ref(null)
+const customBackgroundImgObj = ref(null) // 预加载的图片对象
+
 const scenes = ref([
   {
     id: 1,
@@ -288,6 +319,15 @@ const scenes = ref([
     preview: 'linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%)',
     backgroundColor: '#F0FFFF',
     groundColor: '#E0FFFF'
+  },
+  {
+    id: 4,
+    name: '🖼️ 自定义背景图',
+    preview: 'url(/xia-website/background.png) center/cover',
+    backgroundColor: '#87CEEB',
+    groundColor: '#228B22',
+    isCustom: true,
+    backgroundImage: '/xia-website/background.png'
   }
 ])
 
@@ -313,7 +353,7 @@ const collectibleItems = ref([
   {
     id: 2,
     name: '宝石',
-    x: 400,
+    x: 450,
     y: 300,
     collected: false,
     draw: (ctx, x, y) => {
@@ -330,7 +370,7 @@ const collectibleItems = ref([
   {
     id: 3,
     name: '星星',
-    x: 600,
+    x: 700,
     y: 380,
     collected: false,
     draw: (ctx, x, y, frame) => {
@@ -346,7 +386,7 @@ const collectibleItems = ref([
   {
     id: 4,
     name: '钻石',
-    x: 300,
+    x: 350,
     y: 280,
     collected: false,
     draw: (ctx, x, y) => {
@@ -367,7 +407,7 @@ const collectibleItems = ref([
   {
     id: 5,
     name: '红心',
-    x: 500,
+    x: 900,
     y: 320,
     collected: false,
     draw: (ctx, x, y, frame) => {
@@ -407,14 +447,37 @@ function drawStar(ctx, cx, cy, spikes, outerRadius) {
 }
 
 // 游戏初始化
-const initGame = () => {
+const initGame = async () => {
   ctx = gameCanvas.value.getContext('2d')
   selectedCharacter.value = characters.value[0]
   selectedScene.value = scenes.value[0]
 
+  // 预加载精灵图
+  await loadSpriteWalkImage()
+
   // 绘制资源预览
   nextTick(() => {
     drawResourcePreviews()
+  })
+}
+
+// 预加载精灵图
+const loadSpriteWalkImage = async () => {
+  const img = new Image()
+  spriteWalkImage.value = '/xia-website/role_walk.png'
+
+  await new Promise((resolve) => {
+    img.onload = () => {
+      console.log('精灵图加载成功')
+      spriteWalkImgObj.value = img
+      resolve()
+    }
+    img.onerror = (e) => {
+      console.error('精灵图加载失败:', spriteWalkImage.value, e)
+      spriteWalkImgObj.value = null
+      resolve()
+    }
+    img.src = spriteWalkImage.value
   })
 }
 
@@ -424,12 +487,17 @@ const drawResourcePreviews = () => {
   characters.value.forEach(char => {
     if (char.previewRef) {
       const previewCtx = char.previewRef.getContext('2d')
-      previewCtx.clearRect(0, 0, 64, 64)
+      previewCtx.clearRect(0, 0, 96, 144)
 
       // 绘制棋盘格背景
-      drawCheckerboard(previewCtx, 64, 64)
+      drawCheckerboard(previewCtx, 96, 144)
 
-      char.draw(previewCtx, 0, 0, 0, 'right')
+      // 在预览中绘制缩小的角色（居中显示）
+      previewCtx.save()
+      previewCtx.scale(0.33, 0.33) // 缩小到约1/3以适应预览框
+      previewCtx.translate(0, 0)
+      char.draw(previewCtx, 0, 0, 0, 'down')
+      previewCtx.restore()
     }
   })
 
@@ -464,46 +532,63 @@ const drawCheckerboard = (ctx, width, height) => {
 const drawScene = () => {
   if (!ctx || !selectedScene.value) return
 
-  // 清空画布
-  ctx.fillStyle = selectedScene.value.backgroundColor
-  ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+  // 如果是自定义背景且有预加载的图片
+  if (selectedScene.value.isCustom && customBackgroundImgObj.value) {
+    // 使用 cover 模式绘制背景（保持宽高比，裁剪多余部分）
+    drawImageCover(ctx, customBackgroundImgObj.value, 0, 0, canvasWidth, canvasHeight)
+  } else if (selectedScene.value.isCustom && customBackgroundImage.value) {
+    // 尝试异步加载背景图片
+    const img = new Image()
+    // 不设置 crossOrigin，避免 CORS 问题
+    img.onload = () => {
+      console.log('背景图片加载成功')
+      customBackgroundImgObj.value = img
+      drawImageCover(ctx, img, 0, 0, canvasWidth, canvasHeight)
+    }
+    img.onerror = (e) => {
+      console.error('背景图片加载失败:', customBackgroundImage.value, e)
+      // 失败时使用默认背景
+      ctx.fillStyle = selectedScene.value.backgroundColor
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+      // 绘制地面
+      ctx.fillStyle = selectedScene.value.groundColor
+      ctx.fillRect(0, canvasHeight - 100, canvasWidth, 100)
+    }
+    img.src = customBackgroundImage.value
+    return
+  } else {
+    // 清空画布
+    ctx.fillStyle = selectedScene.value.backgroundColor
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
-  // 绘制地面
-  ctx.fillStyle = selectedScene.value.groundColor
-  ctx.fillRect(0, canvasHeight - 100, canvasWidth, 100)
-
-  // 绘制一些装饰
-  drawDecorations()
+    // 绘制地面
+    ctx.fillStyle = selectedScene.value.groundColor
+    ctx.fillRect(0, canvasHeight - 100, canvasWidth, 100)
+  }
 }
 
-// 绘制装饰
-const drawDecorations = () => {
-  // 绘制云朵
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
-  drawCloud(100, 60)
-  drawCloud(400, 80)
-  drawCloud(650, 50)
+// 使用 cover 模式绘制图片（保持宽高比，裁剪多余部分）
+const drawImageCover = (ctx, img, x, y, w, h) => {
+  const imgRatio = img.width / img.height
+  const canvasRatio = w / h
 
-  // 绘制草丛
-  ctx.fillStyle = '#32CD32'
-  drawGrass(150, canvasHeight - 100)
-  drawGrass(300, canvasHeight - 100)
-  drawGrass(500, canvasHeight - 100)
-  drawGrass(700, canvasHeight - 100)
-}
+  let drawWidth, drawHeight, offsetX, offsetY
 
-const drawCloud = (x, y) => {
-  ctx.beginPath()
-  ctx.arc(x, y, 20, 0, Math.PI * 2)
-  ctx.arc(x + 25, y - 5, 25, 0, Math.PI * 2)
-  ctx.arc(x + 50, y, 20, 0, Math.PI * 2)
-  ctx.fill()
-}
+  if (imgRatio > canvasRatio) {
+    // 图片更宽，裁剪左右
+    drawHeight = h
+    drawWidth = h * imgRatio
+    offsetX = x - (drawWidth - w) / 2
+    offsetY = y
+  } else {
+    // 图片更高，裁剪上下
+    drawWidth = w
+    drawHeight = w / imgRatio
+    offsetX = x
+    offsetY = y - (drawHeight - h) / 2
+  }
 
-const drawGrass = (x, y) => {
-  ctx.fillRect(x, y - 15, 3, 15)
-  ctx.fillRect(x + 5, y - 18, 3, 18)
-  ctx.fillRect(x + 10, y - 12, 3, 12)
+  ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight)
 }
 
 // 绘制玩家
@@ -516,15 +601,6 @@ const drawPlayer = () => {
     player.value.frame,
     player.value.direction
   )
-}
-
-// 绘制收集物品
-const drawCollectibles = (currentTime) => {
-  collectibleItems.value.forEach(item => {
-    if (!item.collected) {
-      item.draw(ctx, item.x, item.y, Math.floor(currentTime / 100))
-    }
-  })
 }
 
 // 更新游戏逻辑
@@ -540,9 +616,6 @@ const update = (deltaTime) => {
     player.value.frame = (player.value.frame + 1) % 4
     player.value.frameTime = 0
   }
-
-  // 检测收集
-  checkCollisions()
 }
 
 // 更新玩家
@@ -577,33 +650,7 @@ const updatePlayer = (dt) => {
 
   // 边界检测
   p.x = Math.max(0, Math.min(canvasWidth - p.width, p.x))
-  p.y = Math.max(0, Math.min(canvasHeight - 100 - p.height, p.y))
-}
-
-// 碰撞检测
-const checkCollisions = () => {
-  const p = player.value
-
-  collectibleItems.value.forEach(item => {
-    if (item.collected) return
-
-    // 简单的矩形碰撞检测
-    if (
-      p.x < item.x + 32 &&
-      p.x + p.width > item.x &&
-      p.y < item.y + 32 &&
-      p.y + p.height > item.y
-    ) {
-      item.collected = true
-      gameStats.value.score += 100
-      gameStats.value.collected += 1
-
-      // 检查游戏结束
-      if (gameStats.value.collected >= gameStats.value.totalItems) {
-        endGame()
-      }
-    }
-  })
+  p.y = Math.max(250, Math.min(canvasHeight - p.height, p.y))
 }
 
 // 游戏循环
@@ -622,27 +669,10 @@ const gameLoop = (currentTime) => {
   // 绘制场景
   drawScene()
 
-  // 绘制收集物品
-  drawCollectibles(currentTime)
-
   // 绘制玩家
   drawPlayer()
 
-  // 绘制UI
-  drawUI()
-
   gameLoopId = requestAnimationFrame(gameLoop)
-}
-
-// 绘制UI
-const drawUI = () => {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
-  ctx.fillRect(10, 10, 150, 60)
-
-  ctx.fillStyle = 'white'
-  ctx.font = 'bold 14px Arial'
-  ctx.fillText(`分数: ${gameStats.value.score}`, 20, 30)
-  ctx.fillText(`生命: ${gameStats.value.lives}`, 20, 50)
 }
 
 // 输入处理
@@ -712,7 +742,6 @@ const resetGame = () => {
   // 初始绘制
   if (ctx) {
     drawScene()
-    drawCollectibles(0)
     drawPlayer()
   }
 }
@@ -737,11 +766,33 @@ const selectCharacter = (char) => {
   }
 }
 
-const selectScene = (scene) => {
+const selectScene = async (scene) => {
   selectedScene.value = scene
+
+  // 如果是自定义背景场景，预加载背景图片
+  if (scene.isCustom && scene.backgroundImage) {
+    customBackgroundImage.value = scene.backgroundImage
+
+    const img = new Image()
+    // 不设置 crossOrigin，避免 CORS 问题
+
+    await new Promise((resolve) => {
+      img.onload = () => {
+        console.log('背景图片预加载成功')
+        customBackgroundImgObj.value = img
+        resolve()
+      }
+      img.onerror = (e) => {
+        console.error('背景图片预加载失败:', scene.backgroundImage, e)
+        customBackgroundImgObj.value = null
+        resolve()
+      }
+      img.src = scene.backgroundImage
+    })
+  }
+
   if (!isPlaying.value && ctx) {
     drawScene()
-    drawCollectibles(0)
     drawPlayer()
   }
 }

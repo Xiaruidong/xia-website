@@ -1,0 +1,17 @@
+# 微信文章链接列表
+# 每行一个链接，以 # 开头的行为注释
+
+# 国资小新 - 央企招聘文章
+# https://mp.weixin.qq.com/s/xxxxxxxxxxxxxx
+# https://mp.weixin.qq.com/s/yyyyyyyyyyyyyy
+
+# 神仙外企 - 外企招聘文章
+# https://mp.weixin.qq.com/s/zzzzzzzzzzzzzz
+
+# 使用说明：
+# 1. 将微信文章链接粘贴到下面（每行一个）
+# 2. 删除链接开头的 # 号
+# 3. 保存文件后运行: python extract_links.py
+
+# 示例格式：
+# https://mp.weixin.qq.com/s/AbCdEfGhIjKlMnOpQrStUv

@@ -1,920 +1,374 @@
 <template>
-  <div class="crawler-page">
+  <div class="job-crawler-page">
     <div class="page-header">
-      <h1 class="page-title">招聘投递链接爬虫工具</h1>
-      <p class="page-subtitle">自动化爬取国央企、大厂招聘信息并整理投递链接</p>
+      <h1 class="page-title">招聘投递链接提取</h1>
+      <p class="page-subtitle">从公众号文章中快速提取投递链接</p>
       <div class="header-divider"></div>
     </div>
 
     <div class="crawler-container">
-      <!-- 配置面板 -->
-      <section class="config-panel">
-        <h2 class="panel-title">爬虫配置</h2>
+      <!-- 输入区域 -->
+      <section class="input-section">
+        <h2 class="section-title">输入内容</h2>
 
-        <!-- 渠道配置 -->
-        <div class="config-section">
-          <h3 class="section-title">爬取渠道</h3>
-          <div class="channel-groups">
-            <div class="channel-group">
-              <h4>微信公众号（推荐）</h4>
-              <div class="channel-list">
-                <label v-for="channel in wechatChannels" :key="channel.id" class="channel-item">
-                  <input
-                    type="checkbox"
-                    v-model="channel.selected"
-                    :disabled="isRunning"
-                  />
-                  <span class="channel-name">{{ channel.name }}</span>
-                  <span class="channel-tag">公众号</span>
-                </label>
-              </div>
-            </div>
-
-            <div class="channel-group">
-              <h4>国央企官方渠道</h4>
-              <div class="channel-list">
-                <label v-for="channel in stateOwnedChannels" :key="channel.id" class="channel-item">
-                  <input
-                    type="checkbox"
-                    v-model="channel.selected"
-                    :disabled="isRunning"
-                  />
-                  <span class="channel-name">{{ channel.name }}</span>
-                  <span class="channel-url">{{ channel.url }}</span>
-                </label>
-              </div>
-            </div>
-
-            <div class="channel-group">
-              <h4>大厂官方渠道</h4>
-              <div class="channel-list">
-                <label v-for="channel in techCompanyChannels" :key="channel.id" class="channel-item">
-                  <input
-                    type="checkbox"
-                    v-model="channel.selected"
-                    :disabled="isRunning"
-                  />
-                  <span class="channel-name">{{ channel.name }}</span>
-                  <span class="channel-url">{{ channel.url }}</span>
-                </label>
-              </div>
-            </div>
-
-            <div class="channel-group">
-              <h4>第三方招聘平台</h4>
-              <div class="channel-list">
-                <label v-for="channel in platformChannels" :key="channel.id" class="channel-item">
-                  <input
-                    type="checkbox"
-                    v-model="channel.selected"
-                    :disabled="isRunning"
-                  />
-                  <span class="channel-name">{{ channel.name }}</span>
-                  <span class="channel-url">{{ channel.url }}</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div class="channel-actions">
-            <button @click="selectAllChannels" class="action-btn" :disabled="isRunning">全选</button>
-            <button @click="deselectAllChannels" class="action-btn" :disabled="isRunning">取消全选</button>
-          </div>
-        </div>
-
-        <!-- 爬取规则配置 -->
-        <div class="config-section">
-          <h3 class="section-title">爬取规则</h3>
-          <div class="rule-config">
-            <div class="rule-item">
-              <label>爬取频率</label>
-              <select v-model="config.frequency" :disabled="isRunning">
-                <option value="manual">手动执行</option>
-                <option value="daily">每日一次</option>
-                <option value="weekly">每周一次</option>
-                <option value="hourly">每小时</option>
-              </select>
-            </div>
-
-            <div class="rule-item">
-              <label>重试次数</label>
-              <input
-                type="number"
-                v-model.number="config.retryCount"
-                min="0"
-                max="10"
-                :disabled="isRunning"
-              />
-            </div>
-
-            <div class="rule-item">
-              <label>请求间隔（秒）</label>
-              <input
-                type="number"
-                v-model.number="config.requestInterval"
-                min="1"
-                max="60"
-                :disabled="isRunning"
-              />
-            </div>
-
-            <div class="rule-item">
-              <label>超时时间（秒）</label>
-              <input
-                type="number"
-                v-model.number="config.timeout"
-                min="5"
-                max="120"
-                :disabled="isRunning"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- 关键词配置 -->
-        <div class="config-section">
-          <h3 class="section-title">关键词配置</h3>
-          <div class="keyword-config">
-            <div class="keyword-group">
-              <label>投递关键词</label>
-              <div class="tag-list">
-                <span
-                  v-for="(keyword, index) in config.applyKeywords"
-                  :key="index"
-                  class="tag"
-                >
-                  {{ keyword }}
-                  <button @click="removeApplyKeyword(index)" class="tag-remove">×</button>
-                </span>
-                <input
-                  v-model="newApplyKeyword"
-                  @keyup.enter="addApplyKeyword"
-                  placeholder="添加关键词"
-                  class="tag-input"
-                  :disabled="isRunning"
-                />
-              </div>
-            </div>
-
-            <div class="keyword-group">
-              <label>黑名单关键词</label>
-              <div class="tag-list">
-                <span
-                  v-for="(keyword, index) in config.blacklistKeywords"
-                  :key="index"
-                  class="tag tag-danger"
-                >
-                  {{ keyword }}
-                  <button @click="removeBlacklistKeyword(index)" class="tag-remove">×</button>
-                </span>
-                <input
-                  v-model="newBlacklistKeyword"
-                  @keyup.enter="addBlacklistKeyword"
-                  placeholder="添加黑名单关键词"
-                  class="tag-input"
-                  :disabled="isRunning"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 控制按钮 -->
-        <div class="control-section">
+        <div class="input-tabs">
           <button
-            @click="startCrawler"
-            class="control-btn control-btn-start"
-            :disabled="isRunning || !hasSelectedChannels"
+            class="tab-btn"
+            :class="{ active: inputMode === 'url' }"
+            @click="inputMode = 'url'"
           >
-            <span v-if="!isRunning">▶ 启动爬虫</span>
-            <span v-else">⏸ 运行中...</span>
+            文章链接
           </button>
           <button
-            @click="stopCrawler"
-            class="control-btn control-btn-stop"
-            :disabled="!isRunning"
+            class="tab-btn"
+            :class="{ active: inputMode === 'content' }"
+            @click="inputMode = 'content'"
           >
-            ⏹ 停止
+            文章内容
           </button>
           <button
-            @click="testCrawler"
-            class="control-btn control-btn-test"
-            :disabled="isRunning"
+            class="tab-btn"
+            :class="{ active: inputMode === 'batch' }"
+            @click="inputMode = 'batch'"
           >
-            🧪 测试配置
+            批量链接
           </button>
         </div>
-      </section>
 
-      <!-- 状态面板 -->
-      <section class="status-panel">
-        <h2 class="panel-title">运行状态</h2>
-        <div class="status-grid">
-          <div class="status-card">
-            <div class="status-label">状态</div>
-            <div class="status-value" :class="`status-${status.state}`">
-              {{ statusText }}
-            </div>
-          </div>
-          <div class="status-card">
-            <div class="status-label">已爬取</div>
-            <div class="status-value">{{ status.crawledCount }}</div>
-          </div>
-          <div class="status-card">
-            <div class="status-label">提取链接</div>
-            <div class="status-value">{{ status.linkCount }}</div>
-          </div>
-          <div class="status-card">
-            <div class="status-label">有效链接</div>
-            <div class="status-value status-success">{{ status.validLinkCount }}</div>
-          </div>
-          <div class="status-card">
-            <div class="status-label">无效链接</div>
-            <div class="status-value status-error">{{ status.invalidLinkCount }}</div>
-          </div>
-          <div class="status-card">
-            <div class="status-label">进度</div>
-            <div class="status-value">{{ status.progress }}%</div>
-          </div>
-        </div>
-
-        <div v-if="isRunning" class="progress-bar">
-          <div class="progress-fill" :style="{ width: status.progress + '%' }"></div>
-        </div>
-      </section>
-
-      <!-- 结果表格 -->
-      <section class="results-panel">
-        <div class="panel-header">
-          <h2 class="panel-title">爬取结果</h2>
-          <div class="panel-actions">
-            <button @click="exportToExcel" class="export-btn" :disabled="results.length === 0">
-              📊 导出 Excel
-            </button>
-            <button @click="clearResults" class="clear-btn" :disabled="isRunning || results.length === 0">
-              🗑️ 清空结果
-            </button>
-          </div>
-        </div>
-
-        <div class="table-filters">
+        <!-- 单个链接模式 -->
+        <div v-if="inputMode === 'url'" class="input-group">
+          <label>文章链接</label>
           <input
-            v-model="filters.keyword"
-            placeholder="搜索企业或岗位..."
-            class="search-input"
+            v-model="singleUrl"
+            type="url"
+            placeholder="粘贴微信公众号文章链接"
+            class="url-input"
           />
-          <select v-model="filters.companyType" class="filter-select">
-            <option value="">全部类型</option>
-            <option value="国央企">国央企</option>
-            <option value="大厂">大厂</option>
-            <option value="第三方">第三方平台</option>
-          </select>
-          <select v-model="filters.linkStatus" class="filter-select">
-            <option value="">全部状态</option>
-            <option value="有效">有效</option>
-            <option value="无效">无效</option>
-          </select>
-        </div>
-
-        <div class="table-wrapper">
-          <table class="results-table">
-            <thead>
-              <tr>
-                <th @click="sortBy('index')" class="sortable">
-                  序号
-                  <span v-if="sortField === 'index'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th @click="sortBy('updateTime')" class="sortable">
-                  更新/开启时间
-                  <span v-if="sortField === 'updateTime'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th @click="sortBy('companyName')" class="sortable">
-                  企业名称
-                  <span v-if="sortField === 'companyName'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th @click="sortBy('companyNature')" class="sortable">
-                  企业性质
-                  <span v-if="sortField === 'companyNature'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th @click="sortBy('industry')" class="sortable">
-                  行业分类
-                  <span v-if="sortField === 'industry'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th @click="sortBy('recruitmentType')" class="sortable">
-                  招聘类型
-                  <span v-if="sortField === 'recruitmentType'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th @click="sortBy('position')" class="sortable">
-                  招聘岗位
-                  <span v-if="sortField === 'position'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th @click="sortBy('location')" class="sortable">
-                  工作地点
-                  <span v-if="sortField === 'location'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th @click="sortBy('deadline')" class="sortable">
-                  网申截止时间
-                  <span v-if="sortField === 'deadline'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th>投递链接</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in paginatedResults" :key="item.id || index">
-                <td>{{ index + 1 + (currentPage - 1) * pageSize }}</td>
-                <td>{{ item.updateTime }}</td>
-                <td>{{ item.companyName }}</td>
-                <td>
-                  <span class="badge" :class="`badge-${item.companyNature}`">
-                    {{ item.companyNature }}
-                  </span>
-                </td>
-                <td>{{ item.industry }}</td>
-                <td>
-                  <span class="recruitment-badge" :class="`recruitment-${item.recruitmentType}`">
-                    {{ item.recruitmentType }}
-                  </span>
-                </td>
-                <td>{{ item.position }}</td>
-                <td>{{ item.location }}</td>
-                <td>{{ item.deadline }}</td>
-                <td>
-                  <a :href="item.applyLink" target="_blank" class="link" :title="item.applyLink">
-                    {{ item.applyLink.length > 40 ? item.applyLink.substring(0, 40) + '...' : item.applyLink }}
-                  </a>
-                </td>
-              </tr>
-              <tr v-if="paginatedResults.length === 0">
-                <td colspan="10" class="empty-row">暂无数据</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="pagination">
-          <button
-            @click="currentPage--"
-            :disabled="currentPage === 1"
-            class="page-btn"
-          >
-            上一页
+          <button @click="fetchArticle" class="action-btn" :disabled="loading || !singleUrl">
+            {{ loading ? '获取中...' : '获取文章' }}
           </button>
-          <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
+        </div>
+
+        <!-- 文章内容模式 -->
+        <div v-if="inputMode === 'content'" class="input-group">
+          <label>文章内容</label>
+          <textarea
+            v-model="articleContent"
+            placeholder="粘贴文章内容或HTML..."
+            class="content-textarea"
+            rows="10"
+          ></textarea>
+          <button @click="extractFromContent" class="action-btn">
+            提取链接
+          </button>
+        </div>
+
+        <!-- 批量链接模式 -->
+        <div v-if="inputMode === 'batch'" class="input-group">
+          <label>批量链接 (每行一个)</label>
+          <textarea
+            v-model="batchUrls"
+            placeholder="https://mp.weixin.qq.com/s/xxxxx&#10;https://mp.weixin.qq.com/s/yyyyy&#10;..."
+            class="content-textarea"
+            rows="10"
+          ></textarea>
+          <div class="batch-actions">
+            <button @click="processBatch" class="action-btn" :disabled="loading">
+              {{ loading ? `处理中 (${batchProgress.current}/${batchProgress.total})` : '批量处理' }}
+            </button>
+            <button @click="clearBatch" class="secondary-btn">清空</button>
+          </div>
+        </div>
+
+        <div v-if="error" class="error-message">
+          {{ error }}
+        </div>
+      </section>
+
+      <!-- 结果区域 -->
+      <section v-if="results.length > 0" class="results-section">
+        <div class="results-header">
+          <h2 class="section-title">提取结果</h2>
+          <div class="results-stats">
+            共 {{ results.length }} 篇文章，
+            {{ totalLinks }} 个投递链接
+          </div>
+        </div>
+
+        <!-- 筛选 -->
+        <div class="filter-bar">
+          <label>筛选类型：</label>
           <button
-            @click="currentPage++"
-            :disabled="currentPage >= totalPages"
-            class="page-btn"
+            v-for="type in linkTypes"
+            :key="type"
+            class="filter-btn"
+            :class="{ active: selectedTypes.includes(type) }"
+            @click="toggleType(type)"
           >
-            下一页
+            {{ type }}
+          </button>
+        </div>
+
+        <!-- 结果列表 -->
+        <div class="results-list">
+          <div
+            v-for="(article, index) in filteredResults"
+            :key="index"
+            class="article-card"
+          >
+            <div class="article-header">
+              <h3 class="article-title">{{ article.title }}</h3>
+              <span class="link-count">{{ article.links.length }} 个链接</span>
+            </div>
+
+            <div class="links-list">
+              <div
+                v-for="(link, linkIndex) in article.links"
+                :key="linkIndex"
+                class="link-item"
+              >
+                <span class="link-type" :class="`type-${link.type}`">{{ link.type }}</span>
+                <a :href="link.url" target="_blank" class="link-url">
+                  {{ truncateUrl(link.url) }}
+                </a>
+                <button
+                  @click="copyLink(link.url)"
+                  class="copy-btn"
+                  title="复制链接"
+                >
+                  📋
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 导出操作 -->
+        <div class="export-section">
+          <button @click="exportCSV" class="export-btn">
+            📥 导出 CSV
+          </button>
+          <button @click="copyAllLinks" class="export-btn">
+            📋 复制所有链接
+          </button>
+          <button @click="clearResults" class="secondary-btn">
+            清空结果
           </button>
         </div>
       </section>
 
-      <!-- 日志面板 -->
-      <section class="log-panel">
-        <div class="panel-header">
-          <h2 class="panel-title">爬取日志</h2>
-          <div class="panel-actions">
-            <button @click="clearLogs" class="clear-btn" :disabled="logs.length === 0">
-              清空日志
-            </button>
-            <button @click="exportLogs" class="export-btn">
-              导出日志
-            </button>
+      <!-- 使用说明 -->
+      <section class="help-section">
+        <h2 class="section-title">使用说明</h2>
+        <div class="help-content">
+          <h3>如何获取公众号文章链接？</h3>
+          <ol>
+            <li>在微信中打开公众号文章</li>
+            <li>点击右上角 "..." 菜单</li>
+            <li>选择 "复制链接"</li>
+            <li>粘贴到上方输入框</li>
+          </ol>
+
+          <h3>支持的平台</h3>
+          <div class="platform-grid">
+            <span class="platform-tag">牛客网</span>
+            <span class="platform-tag">猎聘</span>
+            <span class="platform-tag">BOSS直聘</span>
+            <span class="platform-tag">拉勾</span>
+            <span class="platform-tag">前程无忧</span>
+            <span class="platform-tag">问卷星</span>
+            <span class="platform-tag">腾讯文档</span>
+            <span class="platform-tag">各大厂招聘官网</span>
           </div>
-        </div>
-        <div class="log-content" ref="logContent">
-          <div
-            v-for="(log, index) in logs"
-            :key="index"
-            class="log-entry"
-            :class="`log-${log.type}`"
-          >
-            <span class="log-time">{{ formatTime(log.time) }}</span>
-            <span class="log-level">[{{ log.level }}]</span>
-            <span class="log-message">{{ log.message }}</span>
-          </div>
-          <div v-if="logs.length === 0" class="log-empty">暂无日志</div>
         </div>
       </section>
     </div>
+
+    <!-- 复制成功提示 -->
+    <transition name="fade">
+      <div v-if="showCopyToast" class="toast">
+        已复制到剪贴板
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed } from 'vue'
+import {
+  extractApplicationLinks,
+  filterApplicationLinks,
+  exportToCSV,
+  copyToClipboard
+} from '../utils/wechat-crawler'
 
-// API 配置
-const API_BASE_URL = 'http://localhost:8000'
-
-// 渠道数据 - 更新为微信公众号
-const wechatChannels = ref([
-  { id: 1, name: '国资小新', selected: true },
-  { id: 2, name: '神仙外企', selected: true },
-  { id: 3, name: '国企招聘', selected: false },
-  { id: 4, name: '国聘', selected: false },
-  { id: 5, name: '中智招聘', selected: false }
-])
-
-const stateOwnedChannels = ref([
-  { id: 1, name: '国家电网', url: 'https://zhaopin.sgcc.com.cn/', selected: false },
-  { id: 2, name: '中石油', url: 'https://hr.petroleumchina.com.cn/', selected: false },
-  { id: 3, name: '中石化', url: 'https://job.sinopec.com/', selected: false },
-  { id: 4, name: '中国建筑', url: 'https://recruit.cscec.com/', selected: false },
-  { id: 5, name: '中国工商银行', url: 'https://job.icbc.com.cn/', selected: false },
-  { id: 6, name: '中国建设银行', url: 'https://job.ccb.com/', selected: false },
-  { id: 7, name: '中国移动', url: 'https://www.10086.cn/aboutus/recruit/', selected: false },
-  { id: 8, name: '中国联通', url: 'https://www.chinaunicom.com.cn/hr/', selected: false },
-  { id: 9, name: '国家能源集团', url: 'https://zhaopin.chnenergy.com.cn/', selected: false },
-  { id: 10, name: '中国铁路', url: 'https://www.china-railway.com.cn/zp/', selected: false }
-])
-
-const techCompanyChannels = ref([
-  { id: 101, name: '腾讯', url: 'https://careers.tencent.com/', selected: false },
-  { id: 102, name: '阿里巴巴', url: 'https://jobs.alibaba.com/', selected: false },
-  { id: 103, name: '字节跳动', url: 'https://jobs.bytedance.com/', selected: false },
-  { id: 104, name: '华为', url: 'https://www.huawei.com/cn/careers/', selected: false },
-  { id: 105, name: '百度', url: 'https://talent.baidu.com/', selected: false },
-  { id: 106, name: '京东', url: 'https://zhaopin.jd.com/', selected: false },
-  { id: 107, name: '美团', url: 'https://zhaopin.meituan.com/', selected: false },
-  { id: 108, name: '网易', url: 'https://hr.163.com/', selected: false },
-  { id: 109, name: '小米', url: 'https://hr.xiaomi.com/', selected: false },
-  { id: 110, name: '滴滴', url: 'https://www.didiglobal.com/careers', selected: false }
-])
-
-const platformChannels = ref([
-  { id: 201, name: '智联招聘', url: 'https://www.zhaopin.com/', selected: false },
-  { id: 202, name: '前程无忧', url: 'https://www.51job.com/', selected: false },
-  { id: 203, name: 'BOSS直聘', url: 'https://www.zhipin.com/', selected: false },
-  { id: 204, name: '拉勾网', url: 'https://www.lagou.com/', selected: false }
-])
-
-// 配置
-const config = ref({
-  frequency: 'manual',
-  retryCount: 3,
-  requestInterval: 2,
-  timeout: 30,
-  maxArticles: 10,
-  applyKeywords: ['投递', '申请', 'apply', 'submit', '简历', 'resume', 'mailTo:', 'career'],
-  blacklistKeywords: ['登录', '注册', 'login', 'register']
-})
-
-const newApplyKeyword = ref('')
-const newBlacklistKeyword = ref('')
-
-// 状态
-const isRunning = ref(false)
-const status = ref({
-  state: 'idle', // idle, running, paused, error
-  crawledCount: 0,
-  linkCount: 0,
-  validLinkCount: 0,
-  invalidLinkCount: 0,
-  progress: 0,
-  currentSource: ''
-})
-
-// 结果
+const inputMode = ref('url')
+const singleUrl = ref('')
+const articleContent = ref('')
+const batchUrls = ref('')
+const loading = ref(false)
+const error = ref('')
 const results = ref([])
-const logs = ref([])
-const logContent = ref(null)
+const selectedTypes = ref([])
+const showCopyToast = ref(false)
+const batchProgress = ref({ current: 0, total: 0 })
 
-// 状态轮询
-let statusPollingInterval = null
-
-// 筛选和排序
-const filters = ref({
-  keyword: '',
-  companyType: '',
-  linkStatus: ''
+const linkTypes = computed(() => {
+  const types = new Set()
+  results.value.forEach(article => {
+    article.links.forEach(link => types.add(link.type))
+  })
+  return Array.from(types)
 })
 
-const sortField = ref('crawlTime')
-const sortAsc = ref(false)
-
-// 分页
-const currentPage = ref(1)
-const pageSize = ref(20)
-
-// 计算属性
-const hasSelectedChannels = computed(() => {
-  return [
-    ...wechatChannels.value,
-    ...stateOwnedChannels.value,
-    ...techCompanyChannels.value,
-    ...platformChannels.value
-  ].some(ch => ch.selected)
-})
-
-const statusText = computed(() => {
-  switch (status.value.state) {
-    case 'idle': return '空闲'
-    case 'running': return '运行中'
-    case 'paused': return '已暂停'
-    case 'error': return '错误'
-    default: return '未知'
-  }
+const totalLinks = computed(() => {
+  return results.value.reduce((sum, article) => sum + article.links.length, 0)
 })
 
 const filteredResults = computed(() => {
-  let filtered = [...results.value]
+  if (selectedTypes.value.length === 0) return results.value
 
-  // 关键词搜索
-  if (filters.value.keyword) {
-    const keyword = filters.value.keyword.toLowerCase()
-    filtered = filtered.filter(item =>
-      item.companyName?.toLowerCase().includes(keyword) ||
-      item.position?.toLowerCase().includes(keyword)
-    )
-  }
-
-  // 企业类型筛选
-  if (filters.value.companyType) {
-    filtered = filtered.filter(item => item.companyType === filters.value.companyType)
-  }
-
-  // 链接状态筛选
-  if (filters.value.linkStatus) {
-    filtered = filtered.filter(item => item.linkStatus === filters.value.linkStatus)
-  }
-
-  // 排序
-  filtered.sort((a, b) => {
-    const aVal = a[sortField.value] || ''
-    const bVal = b[sortField.value] || ''
-    const comparison = aVal > bVal ? 1 : aVal < bVal ? -1 : 0
-    return sortAsc.value ? comparison : -comparison
-  })
-
-  return filtered
+  return results.value.map(article => ({
+    ...article,
+    links: article.links.filter(link => selectedTypes.value.includes(link.type))
+  })).filter(article => article.links.length > 0)
 })
 
-const totalPages = computed(() => {
-  return Math.ceil(filteredResults.value.length / pageSize.value) || 1
-})
+const fetchArticle = async () => {
+  if (!singleUrl.value) return
 
-const paginatedResults = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return filteredResults.value.slice(start, end)
-})
+  loading.value = true
+  error.value = ''
 
-// 方法
-const selectAllChannels = () => {
-  wechatChannels.value.forEach(ch => ch.selected = true)
-  stateOwnedChannels.value.forEach(ch => ch.selected = true)
-  techCompanyChannels.value.forEach(ch => ch.selected = true)
-  platformChannels.value.forEach(ch => ch.selected = true)
-}
-
-const deselectAllChannels = () => {
-  wechatChannels.value.forEach(ch => ch.selected = false)
-  stateOwnedChannels.value.forEach(ch => ch.selected = false)
-  techCompanyChannels.value.forEach(ch => ch.selected = false)
-  platformChannels.value.forEach(ch => ch.selected = false)
-}
-
-const addApplyKeyword = () => {
-  if (newApplyKeyword.value && !config.value.applyKeywords.includes(newApplyKeyword.value)) {
-    config.value.applyKeywords.push(newApplyKeyword.value)
-    newApplyKeyword.value = ''
-  }
-}
-
-const removeApplyKeyword = (index) => {
-  config.value.applyKeywords.splice(index, 1)
-}
-
-const addBlacklistKeyword = () => {
-  if (newBlacklistKeyword.value && !config.value.blacklistKeywords.includes(newBlacklistKeyword.value)) {
-    config.value.blacklistKeywords.push(newBlacklistKeyword.value)
-    newBlacklistKeyword.value = ''
-  }
-}
-
-const removeBlacklistKeyword = (index) => {
-  config.value.blacklistKeywords.splice(index, 1)
-}
-
-const addLog = (level, message, type = 'info') => {
-  logs.value.push({
-    time: new Date(),
-    level,
-    message,
-    type
-  })
-
-  nextTick(() => {
-    if (logContent.value) {
-      logContent.value.scrollTop = logContent.value.scrollHeight
-    }
-  })
-}
-
-const startCrawler = async () => {
   try {
-    isRunning.value = true
-    status.value.state = 'running'
-    status.value.progress = 0
+    // 注意：由于CORS限制，直接在前端请求微信文章可能失败
+    // 建议使用后端代理或用户手动复制内容
+    const response = await fetch(singleUrl.value)
+    const html = await response.text()
 
-    addLog('INFO', '正在连接后端服务...', 'info')
-
-    // 收集选中的渠道
-    const selectedSources = [
-      ...wechatChannels.value.filter(ch => ch.selected).map(ch => ch.name),
-      ...stateOwnedChannels.value.filter(ch => ch.selected).map(ch => ch.url),
-      ...techCompanyChannels.value.filter(ch => ch.selected).map(ch => ch.url),
-      ...platformChannels.value.filter(ch => ch.selected).map(ch => ch.url)
-    ]
-
-    if (selectedSources.length === 0) {
-      addLog('WARN', '请先选择爬取渠道', 'warning')
-      isRunning.value = false
-      status.value.state = 'idle'
-      return
-    }
-
-    addLog('INFO', `选中 ${selectedSources.length} 个爬取渠道`, 'info')
-
-    // 启动后端爬虫任务
-    const response = await fetch(`${API_BASE_URL}/api/crawler/start`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        sources: selectedSources,
-        retry_count: config.value.retryCount,
-        request_interval: config.value.requestInterval,
-        timeout: config.value.timeout,
-        max_articles: config.value.maxArticles
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
-    const data = await response.json()
-
-    if (data.success) {
-      addLog('INFO', '爬虫任务已启动', 'success')
-      addLog('INFO', `预计爬取 ${selectedSources.length} 个渠道`, 'info')
-
-      // 开始轮询状态
-      startStatusPolling()
-    } else {
-      throw new Error(data.message || '启动爬虫失败')
-    }
-
-  } catch (error) {
-    console.error('启动爬虫失败:', error)
-    addLog('ERROR', `启动爬虫失败: ${error.message}`, 'error')
-    addLog('WARN', '请确保后端服务已启动 (python backend/app.py)', 'warning')
-    isRunning.value = false
-    status.value.state = 'error'
-  }
-}
-
-// 状态轮询
-const startStatusPolling = () => {
-  stopStatusPolling()
-
-  statusPollingInterval = setInterval(async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/crawler/status`)
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      // 更新状态
-      status.value.progress = data.progress
-      status.value.crawledCount = data.crawled_count
-      status.value.linkCount = data.link_count
-      status.value.validLinkCount = data.valid_link_count
-      status.value.current_source = data.current_source
-
-      // 更新日志
-      if (data.logs && data.logs.length > 0) {
-        const newLogs = data.logs.filter(log =>
-          !logs.value.some(existing => existing.time === log.time && existing.message === log.message)
-        )
-
-        newLogs.forEach(log => {
-          const logType = log.level === 'ERROR' ? 'error' :
-                         log.level === 'WARN' ? 'warning' :
-                         log.level === 'INFO' ? 'info' : 'success'
-
-          addLog(log.level, log.message, logType)
-        })
-      }
-
-      // 如果任务完成，获取结果
-      if (!data.running && status.value.progress > 0) {
-        stopStatusPolling()
-        await fetchResults()
-        isRunning.value = false
-        status.value.state = 'idle'
-        addLog('INFO', `爬取完成！共获取 ${status.value.linkCount} 条结果`, 'success')
-      }
-
-    } catch (error) {
-      console.error('获取状态失败:', error)
-      // 不中断轮询，网络波动是正常的
-    }
-  }, 2000) // 每2秒轮询一次
-}
-
-const stopStatusPolling = () => {
-  if (statusPollingInterval) {
-    clearInterval(statusPollingInterval)
-    statusPollingInterval = null
-  }
-}
-
-const fetchResults = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/crawler/result`)
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    const data = await response.json()
-
-    if (data.jobs && data.jobs.length > 0) {
-      // 转换数据格式以匹配前端表格
-      results.value = data.jobs.map((job, index) => ({
-        id: Date.now() + index,
-        updateTime: job.update_time,
-        companyName: job.company_name,
-        companyNature: job.company_nature,
-        companyType: job.company_nature === '国央企' ? '国央企' :
-                     job.company_nature === '民企' ? '民企' :
-                     job.company_nature === '外企' ? '外企' : '其他',
-        industry: job.industry,
-        recruitmentType: job.recruitment_type,
-        position: job.position,
-        location: job.location,
-        deadline: job.deadline,
-        applyLink: job.apply_link,
-        crawlTime: new Date(job.update_time),
-        linkStatus: '有效',
-        remark: ''
-      }))
-
-      addLog('INFO', `已加载 ${results.value.length} 条招聘信息`, 'success')
-    }
-
-  } catch (error) {
-    console.error('获取结果失败:', error)
-    addLog('ERROR', `获取结果失败: ${error.message}`, 'error')
-  }
-}
-
-const stopCrawler = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/crawler/stop`, {
-      method: 'POST'
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    addLog('WARN', '正在停止爬虫任务...', 'warning')
-
-  } catch (error) {
-    console.error('停止爬虫失败:', error)
-    addLog('ERROR', `停止爬虫失败: ${error.message}`, 'error')
+    processArticleContent('从链接获取的文章', html, singleUrl.value)
+  } catch (err) {
+    error.value = '获取文章失败，可能是跨域限制。请尝试复制文章内容模式。'
+    console.error('获取文章失败:', err)
   } finally {
-    isRunning.value = false
-    stopStatusPolling()
-    status.value.state = 'paused'
-    addLog('WARN', '用户停止爬虫任务', 'warning')
+    loading.value = false
   }
 }
 
-const testCrawler = () => {
-  addLog('INFO', '测试配置...', 'info')
-  addLog('INFO', `配置验证通过: ${hasSelectedChannels.value ? '已选择渠道' : '未选择渠道'}`, 'success')
-  addLog('INFO', `重试次数: ${config.value.retryCount}`, 'info')
-  addLog('INFO', `请求间隔: ${config.value.requestInterval}秒`, 'info')
-}
-
-const getIndustry = (companyName) => {
-  const industries = {
-    '国家电网': '电力/能源',
-    '中石油': '石油化工',
-    '中石化': '石油化工',
-    '中国建筑': '建筑工程',
-    '中国工商银行': '金融',
-    '中国建设银行': '金融',
-    '中国移动': '通信',
-    '中国联通': '通信',
-    '腾讯': '互联网',
-    '阿里巴巴': '互联网',
-    '字节跳动': '互联网',
-    '华为': '科技',
-    '百度': '互联网',
-    '京东': '互联网',
-    '美团': '互联网',
-    '网易': '互联网',
-    '小米': '科技',
-    '滴滴': '互联网'
+const extractFromContent = () => {
+  if (!articleContent.value.trim()) {
+    error.value = '请输入文章内容'
+    return
   }
-  return industries[companyName] || '其他'
+
+  processArticleContent('手动输入的文章', articleContent.value, '')
 }
 
-const sortBy = (field) => {
-  if (sortField.value === field) {
-    sortAsc.value = !sortAsc.value
-  } else {
-    sortField.value = field
-    sortAsc.value = false
+const processBatch = async () => {
+  const urls = batchUrls.value
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'))
+
+  if (urls.length === 0) {
+    error.value = '请输入至少一个链接'
+    return
   }
+
+  loading.value = true
+  error.value = ''
+  batchProgress.value = { current: 0, total: urls.length }
+
+  for (let i = 0; i < urls.length; i++) {
+    batchProgress.value.current = i + 1
+
+    try {
+      // 由于CORS，这里也需要用户手动获取内容
+      // 或者使用后端API
+      await new Promise(resolve => setTimeout(resolve, 500))
+    } catch (err) {
+      console.error(`处理链接 ${i + 1} 失败:`, err)
+    }
+  }
+
+  loading.value = false
+  error.value = '批量处理功能需要后端支持，请使用单个链接或内容模式'
 }
 
-const formatTime = (time) => {
-  if (!time) return '-'
-  const date = new Date(time)
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
+const processArticleContent = (title, content, url) => {
+  const links = extractApplicationLinks(content)
+  const appLinks = filterApplicationLinks(links)
+
+  if (appLinks.length === 0) {
+    error.value = '未找到投递链接'
+    return
+  }
+
+  results.value.unshift({
+    title,
+    url,
+    links: appLinks,
+    timestamp: Date.now()
   })
+
+  error.value = ''
 }
 
-const exportToExcel = () => {
-  try {
-    addLog('INFO', '正在导出 Excel...', 'info')
+const truncateUrl = (url) => {
+  return url.length > 80 ? url.substring(0, 80) + '...' : url
+}
 
-    // 直接跳转到后端下载链接
-    const downloadUrl = `${API_BASE_URL}/api/crawler/export?t=${Date.now()}`
-    window.location.href = downloadUrl
-
-    addLog('INFO', 'Excel 导出已开始', 'success')
-
-  } catch (error) {
-    console.error('导出 Excel 失败:', error)
-    addLog('ERROR', `导出 Excel 失败: ${error.message}`, 'error')
+const copyLink = async (url) => {
+  const success = await copyToClipboard(url)
+  if (success) {
+    showCopyToast.value = true
+    setTimeout(() => {
+      showCopyToast.value = false
+    }, 2000)
   }
+}
+
+const copyAllLinks = async () => {
+  const allLinks = filteredResults.value
+    .flatMap(article => article.links)
+    .map(link => link.url)
+    .join('\n')
+
+  const success = await copyToClipboard(allLinks)
+  if (success) {
+    showCopyToast.value = true
+    setTimeout(() => {
+      showCopyToast.value = false
+    }, 2000)
+  }
+}
+
+const toggleType = (type) => {
+  const index = selectedTypes.value.indexOf(type)
+  if (index > -1) {
+    selectedTypes.value.splice(index, 1)
+  } else {
+    selectedTypes.value.push(type)
+  }
+}
+
+const exportCSV = () => {
+  exportToCSV(filteredResults.value, '投递链接.csv')
+}
+
+const clearBatch = () => {
+  batchUrls.value = ''
 }
 
 const clearResults = () => {
-  if (confirm('确定要清空所有结果吗？')) {
-    results.value = []
-    status.value = {
-      state: 'idle',
-      crawledCount: 0,
-      linkCount: 0,
-      validLinkCount: 0,
-      invalidLinkCount: 0,
-      progress: 0
-    }
-    addLog('INFO', '结果已清空', 'info')
-  }
+  results.value = []
+  selectedTypes.value = []
+  error.value = ''
 }
-
-const clearLogs = () => {
-  logs.value = []
-}
-
-const exportLogs = () => {
-  const logText = logs.value.map(log =>
-    `[${formatTime(log.time)}] [${log.level}] ${log.message}`
-  ).join('\n')
-
-  const blob = new Blob([logText], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `crawler-log-${Date.now()}.txt`
-  link.click()
-  URL.revokeObjectURL(url)
-
-  addLog('INFO', '日志已导出', 'success')
-}
-
-onMounted(() => {
-  addLog('INFO', '爬虫工具已加载', 'info')
-})
-
-onUnmounted(() => {
-  stopStatusPolling()
-  if (isRunning.value) {
-    stopCrawler()
-  }
-})
 </script>
 
 <style scoped>
-.crawler-page {
+.job-crawler-page {
   padding-top: 120px;
   min-height: 100vh;
   padding-bottom: 60px;
@@ -926,9 +380,9 @@ onUnmounted(() => {
 }
 
 .page-title {
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
   font-weight: 200;
-  letter-spacing: 0.4rem;
+  letter-spacing: 0.5rem;
   color: var(--浅青灰);
   margin-bottom: 15px;
 }
@@ -936,664 +390,372 @@ onUnmounted(() => {
 .page-subtitle {
   font-size: 1rem;
   color: var(--深霜蓝);
-  letter-spacing: 0.2rem;
+  letter-spacing: 0.3rem;
   font-weight: 200;
+  margin-bottom: 30px;
 }
 
 .header-divider {
   width: 60px;
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--霜蓝), transparent);
-  margin: 30px auto;
+  margin: 0 auto;
 }
 
 .crawler-container {
-  max-width: 1600px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 0 30px;
-  display: flex;
-  flex-direction: column;
-  gap: 30px;
 }
 
 section {
   background: var(--柔白);
   border-radius: 20px;
   padding: 40px;
+  margin-bottom: 30px;
   box-shadow: 0 4px 20px rgba(200, 217, 230, 0.15);
 }
 
-.panel-title {
+.section-title {
   font-size: 1.5rem;
   color: var(--浅青灰);
   margin-bottom: 25px;
   font-weight: 400;
 }
 
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
-}
-
-.panel-actions {
+.input-tabs {
   display: flex;
   gap: 10px;
+  margin-bottom: 25px;
+  border-bottom: 2px solid var(--浅雾);
+  padding-bottom: 15px;
 }
 
-/* 配置面板 */
-.config-section {
-  margin-bottom: 30px;
-}
-
-.section-title {
-  font-size: 1.1rem;
+.tab-btn {
+  padding: 12px 25px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
   color: var(--浅青灰);
-  margin-bottom: 15px;
-  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
 }
 
-.channel-groups {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
-  margin-bottom: 15px;
-}
-
-.channel-group h4 {
-  font-size: 0.95rem;
+.tab-btn.active {
+  border-bottom-color: var(--深霜蓝);
   color: var(--深霜蓝);
-  margin-bottom: 10px;
 }
 
-.channel-list {
+.input-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 15px;
 }
 
-.channel-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--浅雾);
-  border-radius: 8px;
-  cursor: pointer;
+.input-group label {
+  font-size: 0.9rem;
+  color: var(--浅青灰);
+  font-weight: 200;
+}
+
+.url-input,
+.content-textarea {
+  width: 100%;
+  padding: 15px 20px;
+  border: 2px solid var(--霜蓝);
+  border-radius: 12px;
+  font-size: 1rem;
+  background: white;
+  color: var(--text-dark);
   transition: all 0.3s ease;
 }
 
-.channel-item:hover {
-  background: var(--霜蓝);
+.url-input:focus,
+.content-textarea:focus {
+  outline: none;
+  border-color: var(--深霜蓝);
+  box-shadow: 0 0 0 3px rgba(200, 217, 230, 0.2);
 }
 
-.channel-name {
-  font-weight: 500;
-  color: var(--浅青灰);
+.content-textarea {
+  font-family: monospace;
+  resize: vertical;
 }
 
-.channel-url {
-  font-size: 0.8rem;
-  color: var(--text-light);
-  margin-left: auto;
-}
-
-.channel-tag {
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  background: rgba(33, 150, 243, 0.1);
-  color: #2196F3;
-  border-radius: 10px;
-  margin-left: auto;
-}
-
-.channel-actions {
-  display: flex;
-  gap: 10px;
+.action-btn,
+.secondary-btn {
+  padding: 15px 30px;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 0.15rem;
 }
 
 .action-btn {
-  padding: 8px 16px;
   background: var(--浅青灰);
   color: var(--米白);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
 }
 
 .action-btn:hover:not(:disabled) {
   background: var(--text-dark);
+  transform: translateY(-2px);
 }
 
 .action-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* 规则配置 */
-.rule-config {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-}
-
-.rule-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.rule-item label {
-  font-size: 0.9rem;
+.secondary-btn {
+  background: var(--浅雾);
   color: var(--浅青灰);
 }
 
-.rule-item input,
-.rule-item select {
-  padding: 10px;
-  border: 1px solid var(--霜蓝);
-  border-radius: 8px;
+.secondary-btn:hover {
+  background: var(--霜蓝);
+}
+
+.batch-actions {
+  display: flex;
+  gap: 15px;
+}
+
+.error-message {
+  padding: 15px 20px;
+  background: rgba(239, 83, 80, 0.1);
+  border: 1px solid #ef5350;
+  border-radius: 12px;
+  color: #ef5350;
+  margin-top: 15px;
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.results-stats {
+  font-size: 0.9rem;
+  color: var(--深霜蓝);
+  font-weight: 600;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 15px 20px;
+  background: var(--浅雾);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.filter-bar label {
+  font-size: 0.9rem;
+  color: var(--浅青灰);
+  margin-right: 10px;
+}
+
+.filter-btn {
+  padding: 8px 16px;
   background: white;
+  border: 2px solid var(--霜蓝);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-/* 关键词配置 */
-.keyword-config {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 30px;
+.filter-btn.active {
+  background: var(--深霜蓝);
+  border-color: var(--深霜蓝);
+  color: white;
 }
 
-.keyword-group {
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.article-card {
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  border: 2px solid var(--浅雾);
+}
+
+.article-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--浅雾);
+}
+
+.article-title {
+  font-size: 1.1rem;
+  color: var(--浅青灰);
+  font-weight: 500;
+}
+
+.link-count {
+  padding: 6px 12px;
+  background: var(--深霜蓝);
+  color: white;
+  border-radius: 15px;
+  font-size: 0.8rem;
+}
+
+.links-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.keyword-group label {
-  font-size: 0.9rem;
-  color: var(--浅青灰);
-}
-
-.tag-list {
+.link-item {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
   align-items: center;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 12px;
+  padding: 12px 15px;
   background: var(--浅雾);
-  border-radius: 20px;
-  font-size: 0.85rem;
-  color: var(--浅青灰);
+  border-radius: 10px;
+  transition: all 0.3s ease;
 }
 
-.tag-danger {
-  background: rgba(239, 83, 80, 0.1);
-  color: #ef5350;
+.link-item:hover {
+  background: var(--霜蓝);
 }
 
-.tag-remove {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.link-type {
+  padding: 4px 10px;
+  background: var(--深霜蓝);
+  color: white;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.link-url {
+  flex: 1;
+  color: var(--text-dark);
+  text-decoration: none;
   font-size: 0.9rem;
-  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.tag-remove:hover {
-  background: rgba(0, 0, 0, 0.2);
+.link-url:hover {
+  color: var(--深霜蓝);
+  text-decoration: underline;
 }
 
-.tag-input {
-  padding: 8px 12px;
-  border: 1px solid var(--霜蓝);
-  border-radius: 20px;
-  font-size: 0.85rem;
-  min-width: 150px;
+.copy-btn {
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.3s ease;
 }
 
-/* 控制按钮 */
-.control-section {
+.copy-btn:hover {
+  background: var(--深霜蓝);
+  transform: scale(1.1);
+}
+
+.export-section {
   display: flex;
   gap: 15px;
-  justify-content: center;
-  padding-top: 20px;
-  border-top: 1px solid var(--霜蓝);
+  flex-wrap: wrap;
+  margin-top: 25px;
+  padding-top: 25px;
+  border-top: 2px solid var(--浅雾);
 }
 
-.control-btn {
-  padding: 15px 40px;
-  font-size: 1rem;
+.export-btn {
+  flex: 1;
+  min-width: 150px;
+  padding: 15px 25px;
+  background: var(--浅青灰);
+  color: white;
   border: none;
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
+  font-size: 1rem;
 }
 
-.control-btn-start {
-  background: var(--浅青灰);
-  color: var(--米白);
-}
-
-.control-btn-start:hover:not(:disabled) {
+.export-btn:hover {
   background: var(--text-dark);
   transform: translateY(-2px);
 }
 
-.control-btn-stop {
-  background: rgba(239, 83, 80, 0.2);
-  color: #ef5350;
+.help-content {
+  color: var(--text-dark);
+  line-height: 1.8;
 }
 
-.control-btn-stop:hover:not(:disabled) {
-  background: rgba(239, 83, 80, 0.3);
-}
-
-.control-btn-test {
-  background: var(--霜蓝);
-  color: var(--米白);
-}
-
-.control-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none !important;
-}
-
-/* 状态面板 */
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.status-card {
-  background: var(--浅雾);
-  border-radius: 12px;
-  padding: 20px;
-  text-align: center;
-}
-
-.status-label {
-  font-size: 0.85rem;
-  color: var(--text-light);
-  margin-bottom: 8px;
-}
-
-.status-value {
-  font-size: 1.5rem;
-  font-weight: 600;
+.help-content h3 {
+  font-size: 1.1rem;
   color: var(--浅青灰);
-}
-
-.status-value.status-success {
-  color: #4CAF50;
-}
-
-.status-value.status-error {
-  color: #ef5350;
-}
-
-.status-idle {
-  color: var(--浅青灰);
-}
-
-.status-running {
-  color: #4CAF50;
-}
-
-.status-error {
-  color: #ef5350;
-}
-
-.progress-bar {
-  height: 8px;
-  background: var(--浅雾);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--霜蓝), var(--深霜蓝));
-  transition: width 0.3s ease;
-}
-
-/* 结果表格 */
-.table-filters {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-
-.search-input {
-  flex: 1;
-  min-width: 200px;
-  padding: 10px 15px;
-  border: 1px solid var(--霜蓝);
-  border-radius: 8px;
-}
-
-.filter-select {
-  padding: 10px 15px;
-  border: 1px solid var(--霜蓝);
-  border-radius: 8px;
-  background: white;
-}
-
-.table-wrapper {
-  overflow-x: auto;
-  border: 1px solid var(--霜蓝);
-  border-radius: 12px;
-}
-
-.results-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-.results-table th,
-.results-table td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid var(--浅雾);
-}
-
-.results-table th {
-  background: var(--浅雾);
-  font-weight: 600;
-  color: var(--浅青灰);
-}
-
-.results-table th.sortable {
-  cursor: pointer;
-  user-select: none;
-}
-
-.results-table th.sortable:hover {
-  background: var(--霜蓝);
-}
-
-.sort-icon {
-  margin-left: 5px;
-  font-size: 0.8rem;
-}
-
-.results-table tbody tr:hover {
-  background: var(--浅雾);
-}
-
-.empty-row {
-  text-align: center;
-  color: var(--text-light);
-  padding: 40px !important;
-}
-
-.badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.badge-国央企 {
-  background: rgba(33, 150, 243, 0.1);
-  color: #2196F3;
-}
-
-.badge-民企 {
-  background: rgba(76, 175, 80, 0.1);
-  color: #4CAF50;
-}
-
-.badge-外企 {
-  background: rgba(156, 39, 176, 0.1);
-  color: #9C27B0;
-}
-
-.badge-其他 {
-  background: rgba(158, 158, 158, 0.1);
-  color: #9E9E9E;
-}
-
-.recruitment-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.recruitment-校招 {
-  background: rgba(33, 150, 243, 0.1);
-  color: #2196F3;
-}
-
-.recruitment-社招 {
-  background: rgba(255, 152, 0, 0.1);
-  color: #FF9800;
-}
-
-.recruitment-实习 {
-  background: rgba(76, 175, 80, 0.1);
-  color: #4CAF50;
-}
-
-.recruitment-不限 {
-  background: rgba(158, 158, 158, 0.1);
-  color: #9E9E9E;
-}
-
-.link {
-  color: var(--深霜蓝);
-  text-decoration: none;
-}
-
-.link:hover {
-  text-decoration: underline;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.status-有效 {
-  background: rgba(76, 175, 80, 0.1);
-  color: #4CAF50;
-}
-
-.status-无效 {
-  background: rgba(239, 83, 80, 0.1);
-  color: #ef5350;
-}
-
-/* 分页 */
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 15px;
   margin-top: 20px;
+  margin-bottom: 15px;
 }
 
-.page-btn {
+.help-content ol {
+  padding-left: 20px;
+}
+
+.help-content li {
+  margin-bottom: 10px;
+}
+
+.platform-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.platform-tag {
   padding: 8px 16px;
   background: var(--浅雾);
-  border: 1px solid var(--霜蓝);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.page-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.page-info {
+  border-radius: 20px;
+  font-size: 0.85rem;
   color: var(--浅青灰);
 }
 
-/* 日志面板 */
-.log-content {
-  max-height: 400px;
-  overflow-y: auto;
-  background: #1e1e1e;
-  border-radius: 10px;
-  padding: 15px;
-  font-family: 'Courier New', monospace;
-  font-size: 0.85rem;
-}
-
-.log-entry {
-  display: flex;
-  gap: 10px;
-  padding: 5px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.log-entry:last-child {
-  border-bottom: none;
-}
-
-.log-time {
-  color: #888;
-}
-
-.log-level {
-  color: var(--霜蓝);
-  font-weight: 600;
-}
-
-.log-message {
-  color: #ddd;
-}
-
-.log-info {
-  color: #ddd;
-}
-
-.log-success {
-  color: #4CAF50;
-}
-
-.log-warning {
-  color: #FF9800;
-}
-
-.log-error {
-  color: #ef5350;
-}
-
-.log-empty {
-  text-align: center;
-  color: #888;
-  padding: 40px;
-}
-
-/* 按钮样式 */
-.export-btn,
-.clear-btn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-}
-
-.export-btn {
+.toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 15px 30px;
   background: var(--浅青灰);
-  color: var(--米白);
+  color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
 }
 
-.export-btn:hover:not(:disabled) {
-  background: var(--text-dark);
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
 }
 
-.clear-btn {
-  background: rgba(239, 83, 80, 0.1);
-  color: #ef5350;
-}
-
-.clear-btn:hover:not(:disabled) {
-  background: rgba(239, 83, 80, 0.2);
-}
-
-.export-btn:disabled,
-.clear-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* 响应式 */
-@media (max-width: 1024px) {
-  .keyword-config {
-    grid-template-columns: 1fr;
-  }
-
-  .channel-groups {
-    grid-template-columns: 1fr;
-  }
-
-  .status-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .crawler-container {
-    padding: 0 15px;
-  }
-
-  section {
-    padding: 20px;
-  }
-
-  .control-section {
-    flex-direction: column;
-  }
-
-  .control-btn {
-    width: 100%;
-  }
-
-  .table-filters {
-    flex-direction: column;
-  }
-
-  .search-input,
-  .filter-select {
-    width: 100%;
-  }
-
-  .results-table {
-    font-size: 0.8rem;
-  }
-
-  .results-table th,
-  .results-table td {
-    padding: 8px 10px;
-  }
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

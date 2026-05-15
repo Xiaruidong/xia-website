@@ -3,7 +3,7 @@
     <!-- Hero Section -->
     <section class="hero">
       <div class="hero-content">
-        <h1 class="hero-title">第一场雪落在冬至</h1>
+        <h1 class="hero-title">落在冬天的第一场雪</h1>
         <p class="hero-subtitle">XIA RUIDONG</p>
         <div class="hero-divider"></div>
         <p class="hero-description">
