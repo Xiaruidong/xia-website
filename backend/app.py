@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
-import pandas as pd
+from openpyxl import Workbook
 from datetime import datetime
 import asyncio
 import aiohttp
@@ -590,28 +590,55 @@ async def export_to_excel():
         raise HTTPException(status_code=400, detail="没有可导出的数据")
 
     try:
-        # 创建DataFrame
-        df = pd.DataFrame([
-            {
-                "更新/开启时间": job.update_time,
-                "企业名称": job.company_name,
-                "企业性质": job.company_nature,
-                "行业分类": job.industry,
-                "招聘类型": job.recruitment_type,
-                "招聘岗位": job.position,
-                "工作地点": job.location,
-                "网申截止时间": job.deadline,
-                "投递链接": job.apply_link
-            }
-            for job in crawler_status["jobs"]
-        ])
+        # 创建工作簿
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "招聘信息"
 
-        # 生成文件名
+        # 添加表头
+        headers = ["更新/开启时间", "企业名称", "企业性质", "行业分类", "招聘类型", "招聘岗位", "工作地点", "网申截止时间", "投递链接"]
+        ws.append(headers)
+
+        # 添加数据行
+        for job in crawler_status["jobs"]:
+            row = [
+                job.update_time,
+                job.company_name,
+                job.company_nature,
+                job.industry,
+                job.recruitment_type,
+                job.position,
+                job.location,
+                job.deadline,
+                job.apply_link
+            ]
+            ws.append(row)
+
+        # 调整列宽
+        column_widths = {
+            'A': 15,  # 更新/开启时间
+            'B': 30,  # 企业名称
+            'C': 12,  # 企业性质
+            'D': 15,  # 行业分类
+            'E': 12,  # 招聘类型
+            'F': 25,  # 招聘岗位
+            'G': 15,  # 工作地点
+            'H': 15,  # 网申截止时间
+            'I': 50   # 投递链接
+        }
+
+        for column, width in column_widths.items():
+            ws.column_dimensions[column].width = width
+
+        # 生成文件名和路径
         filename = f"招聘信息_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        filepath = f"/tmp/{filename}"
 
-        # 保存Excel
-        df.to_excel(filepath, index=False, engine='openpyxl')
+        # Windows 临时目录
+        temp_dir = os.environ.get('TEMP', '/tmp')
+        filepath = os.path.join(temp_dir, filename)
+
+        # 保存Excel文件
+        wb.save(filepath)
 
         # 返回文件
         return FileResponse(
