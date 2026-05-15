@@ -16,6 +16,21 @@
           <h3 class="section-title">爬取渠道</h3>
           <div class="channel-groups">
             <div class="channel-group">
+              <h4>微信公众号（推荐）</h4>
+              <div class="channel-list">
+                <label v-for="channel in wechatChannels" :key="channel.id" class="channel-item">
+                  <input
+                    type="checkbox"
+                    v-model="channel.selected"
+                    :disabled="isRunning"
+                  />
+                  <span class="channel-name">{{ channel.name }}</span>
+                  <span class="channel-tag">公众号</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="channel-group">
               <h4>国央企官方渠道</h4>
               <div class="channel-list">
                 <label v-for="channel in stateOwnedChannels" :key="channel.id" class="channel-item">
@@ -269,17 +284,25 @@
                   序号
                   <span v-if="sortField === 'index'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
                 </th>
+                <th @click="sortBy('updateTime')" class="sortable">
+                  更新/开启时间
+                  <span v-if="sortField === 'updateTime'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
+                </th>
                 <th @click="sortBy('companyName')" class="sortable">
                   企业名称
                   <span v-if="sortField === 'companyName'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
                 </th>
-                <th @click="sortBy('companyType')" class="sortable">
-                  企业类型
-                  <span v-if="sortField === 'companyType'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
+                <th @click="sortBy('companyNature')" class="sortable">
+                  企业性质
+                  <span v-if="sortField === 'companyNature'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
                 </th>
                 <th @click="sortBy('industry')" class="sortable">
-                  所属行业
+                  行业分类
                   <span v-if="sortField === 'industry'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
+                </th>
+                <th @click="sortBy('recruitmentType')" class="sortable">
+                  招聘类型
+                  <span v-if="sortField === 'recruitmentType'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
                 </th>
                 <th @click="sortBy('position')" class="sortable">
                   招聘岗位
@@ -289,50 +312,40 @@
                   工作地点
                   <span v-if="sortField === 'location'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
                 </th>
+                <th @click="sortBy('deadline')" class="sortable">
+                  网申截止时间
+                  <span v-if="sortField === 'deadline'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
+                </th>
                 <th>投递链接</th>
-                <th @click="sortBy('source')" class="sortable">
-                  来源
-                  <span v-if="sortField === 'source'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th @click="sortBy('crawlTime')" class="sortable">
-                  爬取时间
-                  <span v-if="sortField === 'crawlTime'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th @click="sortBy('linkStatus')" class="sortable">
-                  链接状态
-                  <span v-if="sortField === 'linkStatus'" class="sort-icon">{{ sortAsc ? '↑' : '↓' }}</span>
-                </th>
-                <th>备注</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(item, index) in paginatedResults" :key="item.id || index">
                 <td>{{ index + 1 + (currentPage - 1) * pageSize }}</td>
+                <td>{{ item.updateTime }}</td>
                 <td>{{ item.companyName }}</td>
                 <td>
-                  <span class="badge" :class="`badge-${item.companyType}`">
-                    {{ item.companyType }}
+                  <span class="badge" :class="`badge-${item.companyNature}`">
+                    {{ item.companyNature }}
                   </span>
                 </td>
                 <td>{{ item.industry }}</td>
-                <td>{{ item.position }}</td>
-                <td>{{ item.location }}</td>
                 <td>
-                  <a :href="item.applyLink" target="_blank" class="link" :title="item.applyLink">
-                    {{ item.applyLink.length > 30 ? item.applyLink.substring(0, 30) + '...' : item.applyLink }}
-                  </a>
-                </td>
-                <td>{{ item.source }}</td>
-                <td>{{ formatTime(item.crawlTime) }}</td>
-                <td>
-                  <span class="status-badge" :class="`status-${item.linkStatus}`">
-                    {{ item.linkStatus }}
+                  <span class="recruitment-badge" :class="`recruitment-${item.recruitmentType}`">
+                    {{ item.recruitmentType }}
                   </span>
                 </td>
-                <td>{{ item.remark || '-' }}</td>
+                <td>{{ item.position }}</td>
+                <td>{{ item.location }}</td>
+                <td>{{ item.deadline }}</td>
+                <td>
+                  <a :href="item.applyLink" target="_blank" class="link" :title="item.applyLink">
+                    {{ item.applyLink.length > 40 ? item.applyLink.substring(0, 40) + '...' : item.applyLink }}
+                  </a>
+                </td>
               </tr>
               <tr v-if="paginatedResults.length === 0">
-                <td colspan="11" class="empty-row">暂无数据</td>
+                <td colspan="10" class="empty-row">暂无数据</td>
               </tr>
             </tbody>
           </table>
@@ -391,11 +404,22 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 
-// 渠道数据
+// API 配置
+const API_BASE_URL = 'http://localhost:8000'
+
+// 渠道数据 - 更新为微信公众号
+const wechatChannels = ref([
+  { id: 1, name: '国资小新', selected: true },
+  { id: 2, name: '神仙外企', selected: true },
+  { id: 3, name: '国企招聘', selected: false },
+  { id: 4, name: '国聘', selected: false },
+  { id: 5, name: '中智招聘', selected: false }
+])
+
 const stateOwnedChannels = ref([
-  { id: 1, name: '国家电网', url: 'https://zhaopin.sgcc.com.cn/', selected: true },
-  { id: 2, name: '中石油', url: 'https://hr.petroleumchina.com.cn/', selected: true },
-  { id: 3, name: '中石化', url: 'https://job.sinopec.com/', selected: true },
+  { id: 1, name: '国家电网', url: 'https://zhaopin.sgcc.com.cn/', selected: false },
+  { id: 2, name: '中石油', url: 'https://hr.petroleumchina.com.cn/', selected: false },
+  { id: 3, name: '中石化', url: 'https://job.sinopec.com/', selected: false },
   { id: 4, name: '中国建筑', url: 'https://recruit.cscec.com/', selected: false },
   { id: 5, name: '中国工商银行', url: 'https://job.icbc.com.cn/', selected: false },
   { id: 6, name: '中国建设银行', url: 'https://job.ccb.com/', selected: false },
@@ -406,9 +430,9 @@ const stateOwnedChannels = ref([
 ])
 
 const techCompanyChannels = ref([
-  { id: 101, name: '腾讯', url: 'https://careers.tencent.com/', selected: true },
-  { id: 102, name: '阿里巴巴', url: 'https://jobs.alibaba.com/', selected: true },
-  { id: 103, name: '字节跳动', url: 'https://jobs.bytedance.com/', selected: true },
+  { id: 101, name: '腾讯', url: 'https://careers.tencent.com/', selected: false },
+  { id: 102, name: '阿里巴巴', url: 'https://jobs.alibaba.com/', selected: false },
+  { id: 103, name: '字节跳动', url: 'https://jobs.bytedance.com/', selected: false },
   { id: 104, name: '华为', url: 'https://www.huawei.com/cn/careers/', selected: false },
   { id: 105, name: '百度', url: 'https://talent.baidu.com/', selected: false },
   { id: 106, name: '京东', url: 'https://zhaopin.jd.com/', selected: false },
@@ -431,6 +455,7 @@ const config = ref({
   retryCount: 3,
   requestInterval: 2,
   timeout: 30,
+  maxArticles: 10,
   applyKeywords: ['投递', '申请', 'apply', 'submit', '简历', 'resume', 'mailTo:', 'career'],
   blacklistKeywords: ['登录', '注册', 'login', 'register']
 })
@@ -446,13 +471,17 @@ const status = ref({
   linkCount: 0,
   validLinkCount: 0,
   invalidLinkCount: 0,
-  progress: 0
+  progress: 0,
+  currentSource: ''
 })
 
 // 结果
 const results = ref([])
 const logs = ref([])
 const logContent = ref(null)
+
+// 状态轮询
+let statusPollingInterval = null
 
 // 筛选和排序
 const filters = ref({
@@ -471,6 +500,7 @@ const pageSize = ref(20)
 // 计算属性
 const hasSelectedChannels = computed(() => {
   return [
+    ...wechatChannels.value,
     ...stateOwnedChannels.value,
     ...techCompanyChannels.value,
     ...platformChannels.value
@@ -532,12 +562,14 @@ const paginatedResults = computed(() => {
 
 // 方法
 const selectAllChannels = () => {
+  wechatChannels.value.forEach(ch => ch.selected = true)
   stateOwnedChannels.value.forEach(ch => ch.selected = true)
   techCompanyChannels.value.forEach(ch => ch.selected = true)
   platformChannels.value.forEach(ch => ch.selected = true)
 }
 
 const deselectAllChannels = () => {
+  wechatChannels.value.forEach(ch => ch.selected = false)
   stateOwnedChannels.value.forEach(ch => ch.selected = false)
   techCompanyChannels.value.forEach(ch => ch.selected = false)
   platformChannels.value.forEach(ch => ch.selected = false)
@@ -581,69 +613,190 @@ const addLog = (level, message, type = 'info') => {
 }
 
 const startCrawler = async () => {
-  isRunning.value = true
-  status.value.state = 'running'
-  status.value.progress = 0
+  try {
+    isRunning.value = true
+    status.value.state = 'running'
+    status.value.progress = 0
 
-  addLog('INFO', '爬虫任务启动', 'success')
+    addLog('INFO', '正在连接后端服务...', 'info')
 
-  const selectedChannels = [
-    ...stateOwnedChannels.value.filter(ch => ch.selected),
-    ...techCompanyChannels.value.filter(ch => ch.selected),
-    ...platformChannels.value.filter(ch => ch.selected)
-  ]
+    // 收集选中的渠道
+    const selectedSources = [
+      ...wechatChannels.value.filter(ch => ch.selected).map(ch => ch.name),
+      ...stateOwnedChannels.value.filter(ch => ch.selected).map(ch => ch.url),
+      ...techCompanyChannels.value.filter(ch => ch.selected).map(ch => ch.url),
+      ...platformChannels.value.filter(ch => ch.selected).map(ch => ch.url)
+    ]
 
-  addLog('INFO', `选中 ${selectedChannels.length} 个爬取渠道`, 'info')
-
-  // 模拟爬取过程（实际需要后端支持）
-  for (let i = 0; i < selectedChannels.length; i++) {
-    const channel = selectedChannels[i]
-
-    if (!isRunning.value) break
-
-    addLog('INFO', `正在爬取: ${channel.name}`, 'info')
-
-    // 模拟爬取延迟
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    // 模拟生成结果
-    const mockResult = {
-      id: Date.now() + i,
-      companyName: channel.name,
-      companyType: stateOwnedChannels.value.some(ch => ch.id === channel.id) ? '国央企' :
-                   techCompanyChannels.value.some(ch => ch.id === channel.id) ? '大厂' : '第三方',
-      industry: getIndustry(channel.name),
-      position: '软件工程师',
-      location: '北京',
-      applyLink: channel.url + 'apply/' + Date.now(),
-      source: channel.name,
-      crawlTime: new Date(),
-      linkStatus: '有效',
-      remark: ''
+    if (selectedSources.length === 0) {
+      addLog('WARN', '请先选择爬取渠道', 'warning')
+      isRunning.value = false
+      status.value.state = 'idle'
+      return
     }
 
-    results.value.unshift(mockResult)
-    status.value.crawledCount++
-    status.value.linkCount++
-    status.value.validLinkCount++
+    addLog('INFO', `选中 ${selectedSources.length} 个爬取渠道`, 'info')
 
-    status.value.progress = Math.round(((i + 1) / selectedChannels.length) * 100)
+    // 启动后端爬虫任务
+    const response = await fetch(`${API_BASE_URL}/api/crawler/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sources: selectedSources,
+        retry_count: config.value.retryCount,
+        request_interval: config.value.requestInterval,
+        timeout: config.value.timeout,
+        max_articles: config.value.maxArticles
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+
+    if (data.success) {
+      addLog('INFO', '爬虫任务已启动', 'success')
+      addLog('INFO', `预计爬取 ${selectedSources.length} 个渠道`, 'info')
+
+      // 开始轮询状态
+      startStatusPolling()
+    } else {
+      throw new Error(data.message || '启动爬虫失败')
+    }
+
+  } catch (error) {
+    console.error('启动爬虫失败:', error)
+    addLog('ERROR', `启动爬虫失败: ${error.message}`, 'error')
+    addLog('WARN', '请确保后端服务已启动 (python backend/app.py)', 'warning')
+    isRunning.value = false
+    status.value.state = 'error'
   }
-
-  if (isRunning.value) {
-    addLog('INFO', `爬取完成！共获取 ${status.value.crawledCount} 条结果`, 'success')
-    status.value.state = 'idle'
-  } else {
-    addLog('WARN', '爬虫任务已停止', 'warning')
-    status.value.state = 'paused'
-  }
-
-  isRunning.value = false
 }
 
-const stopCrawler = () => {
-  isRunning.value = false
-  addLog('WARN', '用户停止爬虫任务', 'warning')
+// 状态轮询
+const startStatusPolling = () => {
+  stopStatusPolling()
+
+  statusPollingInterval = setInterval(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/crawler/status`)
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // 更新状态
+      status.value.progress = data.progress
+      status.value.crawledCount = data.crawled_count
+      status.value.linkCount = data.link_count
+      status.value.validLinkCount = data.valid_link_count
+      status.value.current_source = data.current_source
+
+      // 更新日志
+      if (data.logs && data.logs.length > 0) {
+        const newLogs = data.logs.filter(log =>
+          !logs.value.some(existing => existing.time === log.time && existing.message === log.message)
+        )
+
+        newLogs.forEach(log => {
+          const logType = log.level === 'ERROR' ? 'error' :
+                         log.level === 'WARN' ? 'warning' :
+                         log.level === 'INFO' ? 'info' : 'success'
+
+          addLog(log.level, log.message, logType)
+        })
+      }
+
+      // 如果任务完成，获取结果
+      if (!data.running && status.value.progress > 0) {
+        stopStatusPolling()
+        await fetchResults()
+        isRunning.value = false
+        status.value.state = 'idle'
+        addLog('INFO', `爬取完成！共获取 ${status.value.linkCount} 条结果`, 'success')
+      }
+
+    } catch (error) {
+      console.error('获取状态失败:', error)
+      // 不中断轮询，网络波动是正常的
+    }
+  }, 2000) // 每2秒轮询一次
+}
+
+const stopStatusPolling = () => {
+  if (statusPollingInterval) {
+    clearInterval(statusPollingInterval)
+    statusPollingInterval = null
+  }
+}
+
+const fetchResults = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/crawler/result`)
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.jobs && data.jobs.length > 0) {
+      // 转换数据格式以匹配前端表格
+      results.value = data.jobs.map((job, index) => ({
+        id: Date.now() + index,
+        updateTime: job.update_time,
+        companyName: job.company_name,
+        companyNature: job.company_nature,
+        companyType: job.company_nature === '国央企' ? '国央企' :
+                     job.company_nature === '民企' ? '民企' :
+                     job.company_nature === '外企' ? '外企' : '其他',
+        industry: job.industry,
+        recruitmentType: job.recruitment_type,
+        position: job.position,
+        location: job.location,
+        deadline: job.deadline,
+        applyLink: job.apply_link,
+        crawlTime: new Date(job.update_time),
+        linkStatus: '有效',
+        remark: ''
+      }))
+
+      addLog('INFO', `已加载 ${results.value.length} 条招聘信息`, 'success')
+    }
+
+  } catch (error) {
+    console.error('获取结果失败:', error)
+    addLog('ERROR', `获取结果失败: ${error.message}`, 'error')
+  }
+}
+
+const stopCrawler = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/crawler/stop`, {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    addLog('WARN', '正在停止爬虫任务...', 'warning')
+
+  } catch (error) {
+    console.error('停止爬虫失败:', error)
+    addLog('ERROR', `停止爬虫失败: ${error.message}`, 'error')
+  } finally {
+    isRunning.value = false
+    stopStatusPolling()
+    status.value.state = 'paused'
+    addLog('WARN', '用户停止爬虫任务', 'warning')
+  }
 }
 
 const testCrawler = () => {
@@ -698,8 +851,19 @@ const formatTime = (time) => {
 }
 
 const exportToExcel = () => {
-  // 导出 Excel（这里需要使用库如 xlsx）
-  addLog('INFO', '导出 Excel 功能开发中...', 'warning')
+  try {
+    addLog('INFO', '正在导出 Excel...', 'info')
+
+    // 直接跳转到后端下载链接
+    const downloadUrl = `${API_BASE_URL}/api/crawler/export?t=${Date.now()}`
+    window.location.href = downloadUrl
+
+    addLog('INFO', 'Excel 导出已开始', 'success')
+
+  } catch (error) {
+    console.error('导出 Excel 失败:', error)
+    addLog('ERROR', `导出 Excel 失败: ${error.message}`, 'error')
+  }
 }
 
 const clearResults = () => {
@@ -742,6 +906,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  stopStatusPolling()
   if (isRunning.value) {
     stopCrawler()
   }
@@ -871,6 +1036,15 @@ section {
 .channel-url {
   font-size: 0.8rem;
   color: var(--text-light);
+  margin-left: auto;
+}
+
+.channel-tag {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  background: rgba(33, 150, 243, 0.1);
+  color: #2196F3;
+  border-radius: 10px;
   margin-left: auto;
 }
 
@@ -1184,14 +1358,47 @@ section {
   color: #2196F3;
 }
 
-.badge-大厂 {
+.badge-民企 {
+  background: rgba(76, 175, 80, 0.1);
+  color: #4CAF50;
+}
+
+.badge-外企 {
   background: rgba(156, 39, 176, 0.1);
   color: #9C27B0;
 }
 
-.badge-第三方 {
+.badge-其他 {
+  background: rgba(158, 158, 158, 0.1);
+  color: #9E9E9E;
+}
+
+.recruitment-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.recruitment-校招 {
+  background: rgba(33, 150, 243, 0.1);
+  color: #2196F3;
+}
+
+.recruitment-社招 {
   background: rgba(255, 152, 0, 0.1);
   color: #FF9800;
+}
+
+.recruitment-实习 {
+  background: rgba(76, 175, 80, 0.1);
+  color: #4CAF50;
+}
+
+.recruitment-不限 {
+  background: rgba(158, 158, 158, 0.1);
+  color: #9E9E9E;
 }
 
 .link {
