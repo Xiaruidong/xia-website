@@ -665,20 +665,20 @@ const releaseSkill = () => {
     return
   }
 
-  // 根据玩家朝向选择起始帧
-  // 第1行：向上，第2行：向下，第3行：向左，第4行：向右
+  // 根据玩家朝向选择起始帧（与行走图一致）
+  // 第1列：向下(0-3)，第2列：向左(4-7)，第3列：向右(8-11)，第4列：向上(12-15)
   let startFrame = 0
   switch (player.value.direction) {
-    case 'up':
+    case 'down':
       startFrame = 0
       break
-    case 'down':
+    case 'left':
       startFrame = 4
       break
-    case 'left':
+    case 'right':
       startFrame = 8
       break
-    case 'right':
+    case 'up':
       startFrame = 12
       break
     default:
@@ -735,16 +735,15 @@ const drawActiveSkill = () => {
   const srcX = spriteCol * skillFrameWidth.value
   const srcY = spriteRow * skillFrameHeight.value
 
-  // 技能大小调整为角色大小（96x144）
-  const skillScale = 1.5 // 技能放大1.5倍（32x32 * 1.5 = 48x48，较小）
-  const skillWidth = skillFrameWidth.value * skillScale
-  const skillHeight = skillFrameHeight.value * skillScale
+  // 技能大小与角色保持一致（96x144）
+  const skillWidth = player.value.width
+  const skillHeight = player.value.height
 
-  // 绘制位置：以角色中心为基准
-  const drawX = player.value.x + (player.value.width - skillWidth) / 2
-  const drawY = player.value.y + (player.value.height - skillHeight) / 2
+  // 绘制位置：与角色位置完全一致
+  const drawX = player.value.x
+  const drawY = player.value.y
 
-  // 绘制技能动画
+  // 绘制技能动画（拉伸到角色尺寸）
   ctx.imageSmoothingEnabled = false
   ctx.drawImage(
     skillSpriteImgObj.value,
@@ -793,9 +792,16 @@ const updatePlayer = (dt) => {
   p.x += p.vx * dt
   p.y += p.vy * dt
 
-  // 更新朝向
-  if (dx < 0) p.direction = 'left'
-  if (dx > 0) p.direction = 'right'
+  // 更新朝向（优先水平方向，其次垂直方向）
+  if (dx < 0) {
+    p.direction = 'left'
+  } else if (dx > 0) {
+    p.direction = 'right'
+  } else if (dy < 0) {
+    p.direction = 'up'
+  } else if (dy > 0) {
+    p.direction = 'down'
+  }
 
   // 边界检测
   p.x = Math.max(0, Math.min(canvasWidth - p.width, p.x))
