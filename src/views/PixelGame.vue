@@ -39,7 +39,7 @@
             </div>
           </div>
           <div class="skill-hint">
-            💡 技能方向：向上/向下/向左/向右释放时显示对应动画
+            💡 技能：按J释放技能动画，根据朝向显示不同效果（替换角色动画）
           </div>
         </div>
       </section>
@@ -642,6 +642,13 @@ const drawImageCover = (ctx, img, x, y, w, h) => {
 // 绘制玩家
 const drawPlayer = () => {
   if (!ctx || !selectedCharacter.value) return
+
+  // 如果有技能正在播放，绘制技能动画而不是角色
+  if (skills.value.length > 0 && skillSpriteImgObj.value) {
+    drawActiveSkill()
+    return
+  }
+
   selectedCharacter.value.draw(
     ctx,
     player.value.x,
@@ -657,10 +664,6 @@ const releaseSkill = () => {
     console.log('技能精灵图未加载')
     return
   }
-
-  // 计算技能释放位置（根据角色位置）
-  const skillX = player.value.x + player.value.width / 2 - skillFrameWidth.value / 2
-  const skillY = player.value.y + player.value.height / 2 - skillFrameHeight.value / 2
 
   // 根据玩家朝向选择起始帧
   // 第1行：向上，第2行：向下，第3行：向左，第4行：向右
@@ -682,18 +685,15 @@ const releaseSkill = () => {
       startFrame = 0
   }
 
-  // 创建技能对象
+  // 创建技能对象（位置现在在drawActiveSkill中动态计算）
   const skill = {
     id: ++skillIdCounter,
-    x: skillX,
-    y: skillY,
     direction: player.value.direction,
     currentFrame: 0,
     frameTime: 0,
     frameDuration: 100, // 每帧100ms
     totalFrames: 4,
-    startFrame: startFrame,
-    scale: 3 // 技能放大3倍
+    startFrame: startFrame
   }
 
   skills.value.push(skill)
@@ -703,41 +703,54 @@ const releaseSkill = () => {
 
 // 绘制技能
 const drawSkills = () => {
-  if (!skillSpriteImgObj.value || skills.value.length === 0) return
+  // 不再使用此函数，技能动画现在在drawActiveSkill中处理
+}
 
-  skills.value.forEach((skill, index) => {
-    // 更新技能动画
-    skill.frameTime += 16 // 约60fps
-    if (skill.frameTime >= skill.frameDuration) {
-      skill.currentFrame = (skill.currentFrame + 1) % skill.totalFrames
-      skill.frameTime = 0
-    }
+// 绘制激活的技能（替换角色动画）
+const drawActiveSkill = () => {
+  if (skills.value.length === 0 || !skillSpriteImgObj.value) return
 
-    // 如果动画播放完毕，移除技能
-    if (skill.currentFrame === 0 && skill.frameTime === 0 && skill.totalFrames > 0) {
-      skills.value.splice(index, 1)
-      return
-    }
+  // 获取最新的技能
+  const skill = skills.value[0]
 
-    // 计算当前帧在精灵图中的位置
-    const totalCols = skillTotalCols.value
-    const spriteIndex = skill.startFrame + skill.currentFrame
-    const spriteCol = spriteIndex % totalCols
-    const spriteRow = Math.floor(spriteIndex / totalCols)
+  // 更新技能动画
+  skill.frameTime += 16 // 约60fps
+  if (skill.frameTime >= skill.frameDuration) {
+    skill.currentFrame = (skill.currentFrame + 1) % skill.totalFrames
+    skill.frameTime = 0
+  }
 
-    const srcX = spriteCol * skillFrameWidth.value
-    const srcY = spriteRow * skillFrameHeight.value
+  // 如果动画播放完毕（回到第0帧），移除技能
+  if (skill.currentFrame === 0 && skill.frameTime === 0 && skill.totalFrames > 0) {
+    skills.value.shift() // 移除第一个技能
+    return
+  }
 
-    // 绘制技能（放大）
-    ctx.imageSmoothingEnabled = false
-    ctx.drawImage(
-      skillSpriteImgObj.value,
-      srcX, srcY, skillFrameWidth.value, skillFrameHeight.value,
-      skill.x, skill.y,
-      skillFrameWidth.value * skill.scale,
-      skillFrameHeight.value * skill.scale
-    )
-  })
+  // 计算当前帧在精灵图中的位置
+  const totalCols = skillTotalCols.value
+  const spriteIndex = skill.startFrame + skill.currentFrame
+  const spriteCol = spriteIndex % totalCols
+  const spriteRow = Math.floor(spriteIndex / totalCols)
+
+  const srcX = spriteCol * skillFrameWidth.value
+  const srcY = spriteRow * skillFrameHeight.value
+
+  // 技能大小调整为角色大小（96x144）
+  const skillScale = 1.5 // 技能放大1.5倍（32x32 * 1.5 = 48x48，较小）
+  const skillWidth = skillFrameWidth.value * skillScale
+  const skillHeight = skillFrameHeight.value * skillScale
+
+  // 绘制位置：以角色中心为基准
+  const drawX = player.value.x + (player.value.width - skillWidth) / 2
+  const drawY = player.value.y + (player.value.height - skillHeight) / 2
+
+  // 绘制技能动画
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(
+    skillSpriteImgObj.value,
+    srcX, srcY, skillFrameWidth.value, skillFrameHeight.value,
+    drawX, drawY, skillWidth, skillHeight
+  )
 }
 // 更新游戏逻辑
 const update = (deltaTime) => {
@@ -805,11 +818,8 @@ const gameLoop = (currentTime) => {
   // 绘制场景
   drawScene()
 
-  // 绘制玩家
+  // 绘制玩家（如果激活技能则绘制技能动画）
   drawPlayer()
-
-  // 绘制技能
-  drawSkills()
 
   gameLoopId = requestAnimationFrame(gameLoop)
 }
