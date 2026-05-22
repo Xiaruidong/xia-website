@@ -33,6 +33,13 @@
               <span class="key">D</span>
               <span class="key-desc">左/下/右</span>
             </div>
+            <div class="key-row">
+              <span class="key skill-key">J</span>
+              <span class="key-desc">释放技能（根据朝向自动选择方向）</span>
+            </div>
+          </div>
+          <div class="skill-hint">
+            💡 技能方向：向上/向下/向左/向右释放时显示对应动画
           </div>
         </div>
       </section>
@@ -145,7 +152,8 @@ const keys = {
   w: false,
   a: false,
   s: false,
-  d: false
+  d: false,
+  j: false
 }
 
 // 资源标签
@@ -161,6 +169,18 @@ const selectedScene = ref(null)
 // 精灵图角色
 const spriteWalkImage = ref(null)
 const spriteWalkImgObj = ref(null)
+
+// 技能精灵图
+const skillSpriteImage = ref('/xia-website/role_skill1.png')
+const skillSpriteImgObj = ref(null)
+const skillFrameWidth = ref(32)
+const skillFrameHeight = ref(32)
+const skillTotalCols = ref(4)
+const skillTotalRows = ref(4)
+
+// 技能系统
+const skills = ref([])
+let skillIdCounter = 0
 
 // 角色数据
 const characters = ref([
@@ -454,6 +474,7 @@ const initGame = async () => {
 
   // 预加载精灵图
   await loadSpriteWalkImage()
+  await loadSkillSpriteImage()
 
   // 绘制资源预览
   nextTick(() => {
@@ -478,6 +499,33 @@ const loadSpriteWalkImage = async () => {
       resolve()
     }
     img.src = spriteWalkImage.value
+  })
+}
+
+// 预加载技能精灵图
+const loadSkillSpriteImage = async () => {
+  const img = new Image()
+
+  await new Promise((resolve) => {
+    img.onload = () => {
+      console.log('技能精灵图加载成功，尺寸:', img.width, 'x', img.height)
+
+      // 自动计算帧尺寸
+      skillTotalCols.value = 4
+      skillTotalRows.value = 4
+      skillFrameWidth.value = img.width / skillTotalCols.value
+      skillFrameHeight.value = img.height / skillTotalRows.value
+
+      console.log('每帧尺寸:', skillFrameWidth.value, 'x', skillFrameHeight.value)
+      skillSpriteImgObj.value = img
+      resolve()
+    }
+    img.onerror = (e) => {
+      console.error('技能精灵图加载失败:', skillSpriteImage.value, e)
+      skillSpriteImgObj.value = null
+      resolve()
+    }
+    img.src = skillSpriteImage.value
   })
 }
 
@@ -603,6 +651,94 @@ const drawPlayer = () => {
   )
 }
 
+// 释放技能
+const releaseSkill = () => {
+  if (!skillSpriteImgObj.value) {
+    console.log('技能精灵图未加载')
+    return
+  }
+
+  // 计算技能释放位置（根据角色位置）
+  const skillX = player.value.x + player.value.width / 2 - skillFrameWidth.value / 2
+  const skillY = player.value.y + player.value.height / 2 - skillFrameHeight.value / 2
+
+  // 根据玩家朝向选择起始帧
+  // 第1行：向上，第2行：向下，第3行：向左，第4行：向右
+  let startFrame = 0
+  switch (player.value.direction) {
+    case 'up':
+      startFrame = 0
+      break
+    case 'down':
+      startFrame = 4
+      break
+    case 'left':
+      startFrame = 8
+      break
+    case 'right':
+      startFrame = 12
+      break
+    default:
+      startFrame = 0
+  }
+
+  // 创建技能对象
+  const skill = {
+    id: ++skillIdCounter,
+    x: skillX,
+    y: skillY,
+    direction: player.value.direction,
+    currentFrame: 0,
+    frameTime: 0,
+    frameDuration: 100, // 每帧100ms
+    totalFrames: 4,
+    startFrame: startFrame,
+    scale: 3 // 技能放大3倍
+  }
+
+  skills.value.push(skill)
+
+  console.log('释放技能，朝向:', player.value.direction, '起始帧:', startFrame)
+}
+
+// 绘制技能
+const drawSkills = () => {
+  if (!skillSpriteImgObj.value || skills.value.length === 0) return
+
+  skills.value.forEach((skill, index) => {
+    // 更新技能动画
+    skill.frameTime += 16 // 约60fps
+    if (skill.frameTime >= skill.frameDuration) {
+      skill.currentFrame = (skill.currentFrame + 1) % skill.totalFrames
+      skill.frameTime = 0
+    }
+
+    // 如果动画播放完毕，移除技能
+    if (skill.currentFrame === 0 && skill.frameTime === 0 && skill.totalFrames > 0) {
+      skills.value.splice(index, 1)
+      return
+    }
+
+    // 计算当前帧在精灵图中的位置
+    const totalCols = skillTotalCols.value
+    const spriteIndex = skill.startFrame + skill.currentFrame
+    const spriteCol = spriteIndex % totalCols
+    const spriteRow = Math.floor(spriteIndex / totalCols)
+
+    const srcX = spriteCol * skillFrameWidth.value
+    const srcY = spriteRow * skillFrameHeight.value
+
+    // 绘制技能（放大）
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(
+      skillSpriteImgObj.value,
+      srcX, srcY, skillFrameWidth.value, skillFrameHeight.value,
+      skill.x, skill.y,
+      skillFrameWidth.value * skill.scale,
+      skillFrameHeight.value * skill.scale
+    )
+  })
+}
 // 更新游戏逻辑
 const update = (deltaTime) => {
   const dt = deltaTime / 1000
@@ -672,6 +808,9 @@ const gameLoop = (currentTime) => {
   // 绘制玩家
   drawPlayer()
 
+  // 绘制技能
+  drawSkills()
+
   gameLoopId = requestAnimationFrame(gameLoop)
 }
 
@@ -681,6 +820,11 @@ const handleKeyDown = (e) => {
   if (keys.hasOwnProperty(key)) {
     keys[key] = true
     e.preventDefault()
+
+    // J键释放技能
+    if (key === 'j' && isPlaying.value) {
+      releaseSkill()
+    }
   }
 }
 
@@ -951,9 +1095,26 @@ section {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.skill-key {
+  border-color: #FF6B6B;
+  background: linear-gradient(135deg, #FFE66D, #FF6B6B);
+  color: white;
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+}
+
 .key-desc {
   font-size: 0.9rem;
   color: var(--text-light);
+}
+
+.skill-hint {
+  margin-top: 15px;
+  padding: 12px 16px;
+  background: var(--浅雾);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--text-dark);
+  line-height: 1.5;
 }
 
 /* 游戏统计 */

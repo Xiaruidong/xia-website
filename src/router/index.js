@@ -9,6 +9,7 @@ import SpriteTool from '../views/SpriteTool.vue'
 import ReportTool from '../views/ReportTool.vue'
 import PixelGame from '../views/PixelGame.vue'
 import JobCrawler from '../views/JobCrawler.vue'
+import TranscribeTool from '../views/TranscribeTool.vue'
 import AdminLogin from '../views/admin/Login.vue'
 import AdminDashboard from '../views/admin/Dashboard.vue'
 import AdminPosts from '../views/admin/Posts.vue'
@@ -60,6 +61,11 @@ const routes = [
     path: '/job-crawler',
     name: 'JobCrawler',
     component: JobCrawler
+  },
+  {
+    path: '/transcribe-tool',
+    name: 'TranscribeTool',
+    component: TranscribeTool
   },
   {
     path: '/admin',
