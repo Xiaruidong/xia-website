@@ -710,18 +710,10 @@ const drawPlayer = () => {
 // 绘制NPC
 const drawNpcs = () => {
   if (!npcImgObj.value) {
-    console.log('NPC图片未加载')
     return
   }
 
   npcs.value.forEach(npc => {
-    // 更新NPC动画帧
-    npc.frameTime += 16 // 约60fps
-    if (npc.frameTime >= npc.frameDuration) {
-      npc.frame = (npc.frame + 1) % 5 // 5列，所以是5帧循环
-      npc.frameTime = 0
-    }
-
     // 根据方向选择起始行（假设与角色相同：0=向下, 1=向左, 2=向右, 3=向上）
     let startRow = 0
     switch (npc.direction) {
@@ -738,10 +730,6 @@ const drawNpcs = () => {
 
     const srcX = spriteCol * npcFrameWidth.value
     const srcY = spriteRow * npcFrameHeight.value
-
-    // 计算缩放比例以匹配NPC尺寸
-    const scaleX = npc.width / npcFrameWidth.value
-    const scaleY = npc.height / npcFrameHeight.value
 
     // 绘制NPC精灵图帧
     ctx.imageSmoothingEnabled = false
@@ -853,12 +841,21 @@ const update = (deltaTime) => {
   // 更新玩家位置
   updatePlayer(dt)
 
-  // 更新动画帧
+  // 更新玩家动画帧
   player.value.frameTime += deltaTime
   if (player.value.frameTime >= player.value.frameDuration) {
     player.value.frame = (player.value.frame + 1) % 4
     player.value.frameTime = 0
   }
+
+  // 更新NPC动画帧
+  npcs.value.forEach(npc => {
+    npc.frameTime += deltaTime
+    if (npc.frameTime >= npc.frameDuration) {
+      npc.frame = (npc.frame + 1) % 5 // 5列，所以是5帧循环
+      npc.frameTime = 0
+    }
+  })
 }
 
 // 更新玩家
