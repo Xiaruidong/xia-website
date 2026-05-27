@@ -694,9 +694,14 @@ const drawPlayer = () => {
 
 // 绘制NPC
 const drawNpcs = () => {
-  if (!npcImgObj.value) return
+  if (!npcImgObj.value) {
+    console.log('NPC图片未加载')
+    return
+  }
 
+  console.log('绘制NPC，数量:', npcs.value.length)
   npcs.value.forEach(npc => {
+    console.log('绘制NPC:', npc.name, '位置:', npc.x, npc.y)
     // 绘制NPC图片
     ctx.imageSmoothingEnabled = false
     ctx.drawImage(
@@ -976,6 +981,7 @@ const selectCharacter = (char) => {
   drawResourcePreviews()
   if (!isPlaying.value && ctx) {
     drawScene()
+    drawNpcs()
     drawPlayer()
   }
 }
@@ -1007,6 +1013,7 @@ const selectScene = async (scene) => {
 
   if (!isPlaying.value && ctx) {
     drawScene()
+    drawNpcs()
     drawPlayer()
   }
 }
