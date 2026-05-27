@@ -185,6 +185,10 @@ let skillIdCounter = 0
 // NPC系统
 const npcImage = ref('/xia-website/yuan_transparent.png')
 const npcImgObj = ref(null)
+const npcFrameWidth = ref(32)
+const npcFrameHeight = ref(32)
+const npcTotalCols = ref(5)
+const npcTotalRows = ref(4)
 const npcs = ref([
   {
     id: 1,
@@ -193,7 +197,10 @@ const npcs = ref([
     y: 320,
     width: 96,
     height: 144,
-    direction: 'left'
+    direction: 'down',
+    frame: 0,
+    frameTime: 0,
+    frameDuration: 200
   }
 ])
 
@@ -551,6 +558,14 @@ const loadNpcImage = async () => {
   await new Promise((resolve) => {
     img.onload = () => {
       console.log('NPC图片加载成功，尺寸:', img.width, 'x', img.height)
+
+      // 自动计算帧尺寸
+      npcTotalCols.value = 5
+      npcTotalRows.value = 4
+      npcFrameWidth.value = img.width / npcTotalCols.value
+      npcFrameHeight.value = img.height / npcTotalRows.value
+
+      console.log('NPC每帧尺寸:', npcFrameWidth.value, 'x', npcFrameHeight.value)
       npcImgObj.value = img
       resolve()
     }
@@ -699,17 +714,41 @@ const drawNpcs = () => {
     return
   }
 
-  console.log('绘制NPC，数量:', npcs.value.length)
   npcs.value.forEach(npc => {
-    console.log('绘制NPC:', npc.name, '位置:', npc.x, npc.y)
-    // 绘制NPC图片
+    // 更新NPC动画帧
+    npc.frameTime += 16 // 约60fps
+    if (npc.frameTime >= npc.frameDuration) {
+      npc.frame = (npc.frame + 1) % 5 // 5列，所以是5帧循环
+      npc.frameTime = 0
+    }
+
+    // 根据方向选择起始行（假设与角色相同：0=向下, 1=向左, 2=向右, 3=向上）
+    let startRow = 0
+    switch (npc.direction) {
+      case 'down': startRow = 0; break
+      case 'left': startRow = 1; break
+      case 'right': startRow = 2; break
+      case 'up': startRow = 3; break
+      default: startRow = 0
+    }
+
+    // 计算当前帧在精灵图中的位置
+    const spriteCol = npc.frame % npcTotalCols.value
+    const spriteRow = startRow
+
+    const srcX = spriteCol * npcFrameWidth.value
+    const srcY = spriteRow * npcFrameHeight.value
+
+    // 计算缩放比例以匹配NPC尺寸
+    const scaleX = npc.width / npcFrameWidth.value
+    const scaleY = npc.height / npcFrameHeight.value
+
+    // 绘制NPC精灵图帧
     ctx.imageSmoothingEnabled = false
     ctx.drawImage(
       npcImgObj.value,
-      npc.x,
-      npc.y,
-      npc.width,
-      npc.height
+      srcX, srcY, npcFrameWidth.value, npcFrameHeight.value,
+      npc.x, npc.y, npc.width, npc.height
     )
   })
 }
