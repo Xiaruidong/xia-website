@@ -182,6 +182,21 @@ const skillTotalRows = ref(4)
 const skills = ref([])
 let skillIdCounter = 0
 
+// NPC系统
+const npcImage = ref('/xia-website/yuan_transparent.png')
+const npcImgObj = ref(null)
+const npcs = ref([
+  {
+    id: 1,
+    name: 'NPC小圆',
+    x: 400,
+    y: 320,
+    width: 96,
+    height: 144,
+    direction: 'left'
+  }
+])
+
 // 角色数据
 const characters = ref([
   {
@@ -475,6 +490,7 @@ const initGame = async () => {
   // 预加载精灵图
   await loadSpriteWalkImage()
   await loadSkillSpriteImage()
+  await loadNpcImage()
 
   // 绘制资源预览
   nextTick(() => {
@@ -526,6 +542,24 @@ const loadSkillSpriteImage = async () => {
       resolve()
     }
     img.src = skillSpriteImage.value
+  })
+}
+
+const loadNpcImage = async () => {
+  const img = new Image()
+
+  await new Promise((resolve) => {
+    img.onload = () => {
+      console.log('NPC图片加载成功，尺寸:', img.width, 'x', img.height)
+      npcImgObj.value = img
+      resolve()
+    }
+    img.onerror = (e) => {
+      console.error('NPC图片加载失败:', npcImage.value, e)
+      npcImgObj.value = null
+      resolve()
+    }
+    img.src = npcImage.value
   })
 }
 
@@ -656,6 +690,23 @@ const drawPlayer = () => {
     player.value.frame,
     player.value.direction
   )
+}
+
+// 绘制NPC
+const drawNpcs = () => {
+  if (!npcImgObj.value) return
+
+  npcs.value.forEach(npc => {
+    // 绘制NPC图片
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(
+      npcImgObj.value,
+      npc.x,
+      npc.y,
+      npc.width,
+      npc.height
+    )
+  })
 }
 
 // 释放技能
@@ -826,6 +877,9 @@ const gameLoop = (currentTime) => {
 
   // 绘制玩家（如果激活技能则绘制技能动画）
   drawPlayer()
+
+  // 绘制NPC
+  drawNpcs()
 
   gameLoopId = requestAnimationFrame(gameLoop)
 }
