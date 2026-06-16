@@ -10,6 +10,7 @@ import ReportTool from '../views/ReportTool.vue'
 import PixelGame from '../views/PixelGame.vue'
 import JobCrawler from '../views/JobCrawler.vue'
 import TranscribeTool from '../views/TranscribeTool.vue'
+import GoldPrice from '../views/GoldPrice.vue'
 import AdminLogin from '../views/admin/Login.vue'
 import AdminDashboard from '../views/admin/Dashboard.vue'
 import AdminPosts from '../views/admin/Posts.vue'
@@ -66,6 +67,11 @@ const routes = [
     path: '/transcribe-tool',
     name: 'TranscribeTool',
     component: TranscribeTool
+  },
+  {
+    path: '/gold-price',
+    name: 'GoldPrice',
+    component: GoldPrice
   },
   {
     path: '/admin',
