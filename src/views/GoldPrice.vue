@@ -145,15 +145,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { fetchPriceData, fetchMAData, TRADING_SYMBOLS } from '../utils/config'
 
 // 可用的交易品种
-const availableSymbols = ref([
-  { id: 'gold', name: '黄金现货', symbol: 'GC=F', type: 'future' },
-  { id: 'gold_etf', name: '黄金ETF (GLD)', symbol: 'GLD', type: 'etf' },
-  { id: 'silver', name: '白银期货', symbol: 'SI=F', type: 'future' },
-  { id: 'oil', name: '原油期货', symbol: 'CL=F', type: 'future' }
-])
+const availableSymbols = ref(TRADING_SYMBOLS)
 
 // 当前选择的品种
 const currentSymbol = ref(availableSymbols.value[0])
@@ -203,61 +199,80 @@ const fetchPrice = async () => {
   error.value = ''
 
   try {
-    // TODO: 这里需要后端API支持，暂时使用模拟数据
-    // const response = await fetch(`/api/price/${currentSymbol.value.symbol}`)
-    // const data = await response.json()
+    // 获取价格数据
+    const priceData = await fetchPriceData(currentSymbol.value.id)
 
-    // 模拟数据
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // 更新价格信息
+    currentPrice.value = priceData.current_price
+    priceChange.value = priceData.change
+    priceChangePercent.value = priceData.change_percent.toFixed(2)
+    priceStats.value = {
+      open: priceData.open,
+      high: priceData.high,
+      low: priceData.low,
+      prevClose: priceData.prev_close
+    }
 
-    if (currentSymbol.value.id === 'gold' || currentSymbol.value.id === 'gold_etf') {
-      // 黄金模拟数据
-      const basePrice = currentSymbol.value.id === 'gold' ? 2350.50 : 225.30
-      const change = (Math.random() - 0.5) * 20
-      currentPrice.value = (basePrice + change).toFixed(2)
-      priceChange.value = change.toFixed(2)
-      priceChangePercent.value = ((change / basePrice) * 100).toFixed(2)
-      priceStats.value = {
-        open: (basePrice - 5).toFixed(2),
-        high: (basePrice + 8).toFixed(2),
-        low: (basePrice - 12).toFixed(2),
-        prevClose: (basePrice - 3).toFixed(2)
-      }
-
-      // 模拟均线数据
-      maData.value = {
-        loading: false,
-        short: (basePrice + 2).toFixed(2),
-        medium: (basePrice - 1).toFixed(2),
-        long: (basePrice - 5).toFixed(2),
-        signal: change > 0 ? 'bullish' : 'bearish',
-        signalText: change > 0 ? '看涨 - 短期均线上穿中期均线' : '看跌 - 短期均线下穿中期均线'
-      }
-    } else {
-      // 其他品种模拟数据
-      const basePrice = currentSymbol.value.id === 'silver' ? 28.50 : 78.20
-      const change = (Math.random() - 0.5) * 2
-      currentPrice.value = basePrice.toFixed(2)
-      priceChange.value = change.toFixed(2)
-      priceChangePercent.value = ((change / basePrice) * 100).toFixed(2)
+    // 获取均线数据
+    try {
+      const maResponse = await fetchMAData(
+        currentSymbol.value.id,
+        parseInt(maShort.value),
+        parseInt(maMedium.value),
+        parseInt(maLong.value)
+      )
 
       maData.value = {
         loading: false,
-        short: (basePrice + 0.5).toFixed(2),
-        medium: basePrice.toFixed(2),
-        long: (basePrice - 0.5).toFixed(2),
+        short: maResponse.ma_short,
+        medium: maResponse.ma_medium,
+        long: maResponse.ma_long,
+        signal: maResponse.signal,
+        signalText: maResponse.signal_text
+      }
+    } catch (maError) {
+      console.error('获取均线数据失败:', maError)
+      maData.value = {
+        loading: false,
+        short: '--',
+        medium: '--',
+        long: '--',
         signal: 'neutral',
-        signalText: '等待数据...'
+        signalText: '均线数据获取失败'
       }
     }
 
     updateTime.value = new Date().toLocaleTimeString('zh-CN')
     loading.value = false
   } catch (err) {
-    error.value = '获取价格失败: ' + err.message
+    console.error('获取数据失败:', err)
+    error.value = '获取数据失败，请检查后端服务是否启动'
     loading.value = false
   }
 }
+
+// 监听均线参数变化
+watch([maShort, maMedium, maLong], () => {
+  if (!loading.value && currentPrice.value !== '--') {
+    fetchMAData(
+      currentSymbol.value.id,
+      parseInt(maShort.value),
+      parseInt(maMedium.value),
+      parseInt(maLong.value)
+    ).then(maResponse => {
+      maData.value = {
+        loading: false,
+        short: maResponse.ma_short,
+        medium: maResponse.ma_medium,
+        long: maResponse.ma_long,
+        signal: maResponse.signal,
+        signalText: maResponse.signal_text
+      }
+    }).catch(err => {
+      console.error('更新均线数据失败:', err)
+    })
+  }
+})
 
 // 组件挂载时开始更新
 onMounted(() => {
