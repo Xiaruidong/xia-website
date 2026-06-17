@@ -77,11 +77,11 @@
 
       <!-- 价格走势图 -->
       <section class="chart-section">
-        <h2 class="section-title">价格走势</h2>
+        <h2 class="section-title">K线走势</h2>
 
         <div class="chart-controls">
           <div class="control-group">
-            <label>时间范围:</label>
+            <label>时间周期:</label>
             <select v-model="chartPeriod" @change="fetchChartData">
               <option value="1d">1天</option>
               <option value="5d">5天</option>
@@ -92,7 +92,7 @@
             </select>
           </div>
           <div class="control-group">
-            <label>数据间隔:</label>
+            <label>K线周期:</label>
             <select v-model="chartInterval" @change="fetchChartData">
               <option value="5m">5分钟</option>
               <option value="15m">15分钟</option>
@@ -104,11 +104,11 @@
         </div>
 
         <div v-if="chartData.loading" class="loading-state">
-          <p>正在加载图表数据...</p>
+          <p>正在加载K线数据...</p>
         </div>
 
         <div v-else class="chart-container">
-          <canvas ref="priceChart" width="800" height="400"></canvas>
+          <div ref="priceChart" class="kline-chart"></div>
         </div>
       </section>
 
@@ -184,10 +184,8 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { fetchPriceData, fetchMAData, TRADING_SYMBOLS, API_BASE_URL } from '../utils/config'
-import { Chart, registerables } from 'chart.js'
-
-// 注册Chart.js组件
-Chart.register(...registerables)
+import { createChart } from 'lightweight-charts'
+import { CandlestickSeries } from 'lightweight-charts'
 
 // 可用的交易品种
 const availableSymbols = ref(TRADING_SYMBOLS)
@@ -227,10 +225,10 @@ const chartPeriod = ref('1mo')
 const chartInterval = ref('1d')
 const chartData = ref({
   loading: false,
-  labels: [],
-  prices: []
+  ohlc: [] // OHLC数据: [{time, open, high, low, close}]
 })
 let chartInstance = null
+let candlestickSeries = null
 
 // 状态管理
 const loading = ref(true)
@@ -314,131 +312,108 @@ const fetchChartData = async () => {
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
-    const data = await response.json()
+    const result = await response.json()
 
-    // 更新图表数据
-    chartData.value.labels = data.data.map(item => item.date)
-    chartData.value.prices = data.data.map(item => item.close)
+    // 转换为lightweight-charts需要的格式
+    const ohlcData = result.data.map(item => {
+      const date = new Date(item.date)
+      return {
+        time: date.getTime() / 1000, // 转换为Unix时间戳（秒）
+        open: parseFloat(item.open),
+        high: parseFloat(item.high),
+        low: parseFloat(item.low),
+        close: parseFloat(item.close)
+      }
+    }).sort((a, b) => a.time - b.time) // 按时间排序
+
+    chartData.value.ohlc = ohlcData
     chartData.value.loading = false
 
-    // 渲染图表
+    // 渲染K线图
     nextTick(() => {
       renderChart()
     })
   } catch (err) {
-    console.error('获取图表数据失败:', err)
+    console.error('获取K线数据失败:', err)
     chartData.value.loading = false
   }
 }
 
 // 渲染图表
 const renderChart = () => {
-  if (!priceChart.value) return
+  if (!priceChart.value || chartData.value.ohlc.length === 0) return
 
   // 销毁现有图表
   if (chartInstance) {
-    chartInstance.destroy()
+    chartInstance.remove()
   }
 
-  const ctx = priceChart.value.getContext('2d')
+  // 创建图表容器
+  const container = priceChart.value
 
-  // 根据价格变化确定颜色
-  const firstPrice = chartData.value.prices[0] || 0
-  const lastPrice = chartData.value.prices[chartData.value.prices.length - 1] || 0
-  const isUp = lastPrice >= firstPrice
-  const lineColor = isUp ? '#4CAF50' : '#F44336'
-
-  chartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: chartData.value.labels,
-      datasets: [{
-        label: `${currentSymbol.value.name} 价格`,
-        data: chartData.value.prices,
-        borderColor: lineColor,
-        backgroundColor: isUp ? 'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)',
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        pointHoverRadius: 6,
-        pointHoverBackgroundColor: lineColor,
-        pointHoverBorderColor: '#fff',
-        pointHoverBorderWidth: 2
-      }]
+  // 创建图表实例
+  chartInstance = createChart(container, {
+    width: container.clientWidth,
+    height: 400,
+    layout: {
+      background: { type: 'solid', color: '#ffffff' },
+      textColor: '#333',
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 2,
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          labels: {
-            color: '#666',
-            font: {
-              size: 12
-            }
-          }
-        },
-        tooltip: {
-          mode: 'index',
-          intersect: false,
-          callbacks: {
-            label: function(context) {
-              return `价格: ${context.parsed.y.toFixed(2)}`
-            }
-          }
-        }
+    grid: {
+      vertLines: { color: 'rgba(197, 203, 206, 0.5)' },
+      horzLines: { color: 'rgba(197, 203, 206, 0.5)' },
+    },
+    timeScale: {
+      borderColor: 'rgba(197, 203, 206, 0.8)',
+      timeVisible: true,
+      secondsVisible: false,
+    },
+    rightPriceScale: {
+      borderColor: 'rgba(197, 203, 206, 0.8)',
+    },
+    crosshair: {
+      mode: 1, // 十线模式
+      vertLine: {
+        color: '#758696',
+        width: 1,
+        style: 3, // 虚线
+        labelBackgroundColor: '#4c525e',
       },
-      scales: {
-        x: {
-          display: true,
-          title: {
-            display: true,
-            text: '时间',
-            color: '#666',
-            font: {
-              size: 12
-            }
-          },
-          ticks: {
-            color: '#666',
-            maxTicksLimit: 10
-          },
-          grid: {
-            display: false
-          }
-        },
-        y: {
-          display: true,
-          title: {
-            display: true,
-            text: '价格',
-            color: '#666',
-            font: {
-              size: 12
-            }
-          },
-          ticks: {
-            color: '#666',
-            callback: function(value) {
-              return value.toFixed(2)
-            }
-          },
-          grid: {
-            color: 'rgba(0, 0, 0, 0.05)'
-          }
-        }
+      horzLine: {
+        color: '#758696',
+        width: 1,
+        style: 3, // 虚线
+        labelBackgroundColor: '#4c525e',
       },
-      interaction: {
-        mode: 'nearest',
-        axis: 'x',
-        intersect: false
-      }
-    }
+    },
   })
+
+  // 添加K线系列
+  candlestickSeries = chartInstance.addCandlestickSeries({
+    upColor: '#26a69a', // 涨 - 青色
+    downColor: '#ef5350', // 跌 - 红色
+    borderDownColor: '#ef5350',
+    borderUpColor: '#26a69a',
+    wickDownColor: '#ef5350',
+    wickUpColor: '#26a69a',
+  })
+
+  // 设置数据
+  candlestickSeries.setData(chartData.value.ohlc)
+
+  // 自动调整视图
+  chartInstance.timeScale().fitContent()
+
+  // 响应式调整
+  const resizeObserver = new ResizeObserver(entries => {
+    if (entries.length === 0 || entries[0].target !== container) {
+      return
+    }
+    const newRect = entries[0].contentRect
+    chartInstance.applyOptions({ width: newRect.width - 32 })
+  })
+
+  resizeObserver.observe(container)
 }
 
 // 监听均线参数变化
@@ -478,7 +453,7 @@ onUnmounted(() => {
     clearInterval(updateInterval)
   }
   if (chartInstance) {
-    chartInstance.destroy()
+    chartInstance.remove()
   }
 })
 </script>
@@ -698,13 +673,15 @@ onUnmounted(() => {
 .chart-container {
   position: relative;
   width: 100%;
-  max-width: 800px;
   margin: 0 auto;
 }
 
-.chart-container canvas {
-  width: 100% !important;
-  height: auto !important;
+.kline-chart {
+  width: 100%;
+  height: 400px;
+  border: 1px solid var(--浅雾);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 /* 均线分析 */
