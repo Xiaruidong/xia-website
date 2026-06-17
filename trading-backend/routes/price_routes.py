@@ -4,8 +4,15 @@ from typing import Optional
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
+import time
 
 router = APIRouter()
+
+# 配置yfinance使用用户代理，避免被限制
+try:
+    yf.utils.get_user_agent = lambda: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+except:
+    pass
 
 # 商品代码映射
 SYMBOL_MAP = {
@@ -40,60 +47,77 @@ async def get_price(symbol: str):
     参数:
     - symbol: 商品代码 (gold, gold_etf, silver, oil, copper等)
     """
-    try:
-        # 映射商品代码
-        ticker_symbol = SYMBOL_MAP.get(symbol.lower(), symbol.upper())
+    max_retries = 3
+    retry_delay = 2  # 秒
 
-        # 获取数据
-        ticker = yf.Ticker(ticker_symbol)
+    for attempt in range(max_retries):
+        try:
+            # 映射商品代码
+            ticker_symbol = SYMBOL_MAP.get(symbol.lower(), symbol.upper())
 
-        # 获取今日数据
-        today = datetime.now().strftime('%Y-%m-%d')
-        data = ticker.history(period='1d')
+            # 添加请求间隔，避免频率限制
+            if attempt > 0:
+                time.sleep(retry_delay)
 
-        if data.empty:
-            # 尝试获取最近的数据
-            data = ticker.history(period='2d')
+            # 获取数据
+            ticker = yf.Ticker(ticker_symbol)
+
+            # 获取今日数据
+            data = ticker.history(period='1d')
+
             if data.empty:
-                raise HTTPException(status_code=404, detail="无法获取价格数据")
+                # 尝试获取最近的数据
+                data = ticker.history(period='2d')
+                if data.empty:
+                    raise HTTPException(status_code=404, detail="无法获取价格数据")
 
-        # 获取最新一行数据
-        latest = data.iloc[-1]
+            # 获取最新一行数据
+            latest = data.iloc[-1]
 
-        # 计算涨跌
-        current_price = latest['Close']
-        prev_close = latest.get('Open', latest['Close'])  # 如果没有Open，使用Close
-        change = current_price - prev_close
-        change_percent = (change / prev_close) * 100 if prev_close != 0 else 0
+            # 计算涨跌
+            current_price = latest['Close']
+            prev_close = latest.get('Open', latest['Close'])  # 如果没有Open，使用Close
+            change = current_price - prev_close
+            change_percent = (change / prev_close) * 100 if prev_close != 0 else 0
 
-        # 获取商品名称
-        name_map = {
-            'GC=F': '黄金期货',
-            'GLD': '黄金ETF',
-            'SI=F': '白银期货',
-            'CL=F': '原油期货',
-            'HG=F': '铜期货',
-            'PL=F': '铂金期货',
-            'PA=F': '钯金期货',
-            'NG=F': '天然气期货'
-        }
+            # 获取商品名称
+            name_map = {
+                'GC=F': '黄金期货',
+                'GLD': '黄金ETF',
+                'SI=F': '白银期货',
+                'CL=F': '原油期货',
+                'HG=F': '铜期货',
+                'PL=F': '铂金期货',
+                'PA=F': '钯金期货',
+                'NG=F': '天然气期货'
+            }
 
-        return PriceResponse(
-            symbol=symbol,
-            name=name_map.get(ticker_symbol, f"{symbol} 期货"),
-            current_price=round(current_price, 2),
-            change=round(change, 2),
-            change_percent=round(change_percent, 2),
-            open=round(latest['Open'], 2),
-            high=round(latest['High'], 2),
-            low=round(latest['Low'], 2),
-            prev_close=round(prev_close, 2),
-            volume=int(latest['Volume']) if pd.notna(latest['Volume']) else None,
-            update_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        )
+            return PriceResponse(
+                symbol=symbol,
+                name=name_map.get(ticker_symbol, f"{symbol} 期货"),
+                current_price=round(current_price, 2),
+                change=round(change, 2),
+                change_percent=round(change_percent, 2),
+                open=round(latest['Open'], 2),
+                high=round(latest['High'], 2),
+                low=round(latest['Low'], 2),
+                prev_close=round(prev_close, 2),
+                volume=int(latest['Volume']) if pd.notna(latest['Volume']) else None,
+                update_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取价格失败: {str(e)}")
+        except HTTPException:
+            # 如果是HTTP异常，直接抛出
+            raise
+        except Exception as e:
+            # 如果是最后一次尝试，抛出异常
+            if attempt == max_retries - 1:
+                raise HTTPException(status_code=500, detail=f"获取价格失败: {str(e)}")
+            # 否则继续重试
+            continue
+
+    # 如果所有重试都失败
+    raise HTTPException(status_code=500, detail="获取价格失败：已达到最大重试次数")
 
 @router.get("/price/{symbol}/history")
 async def get_price_history(
