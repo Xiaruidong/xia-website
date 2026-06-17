@@ -398,8 +398,8 @@ const renderChart = async () => {
       },
     })
 
-    // 添加K线系列
-    const candlestickSeries = chartInstance.addCandlestickSeries({
+    // 添加K线系列 - 使用正确的API
+    const candlestickSeries = chartInstance.addSeries(LightweightCharts.CandlestickSeries, {
       upColor: '#26a69a', // 涨 - 青色
       downColor: '#ef5350', // 跌 - 红色
       borderDownColor: '#ef5350',
