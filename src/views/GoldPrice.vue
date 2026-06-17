@@ -181,8 +181,6 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { fetchPriceData, fetchMAData, TRADING_SYMBOLS, API_BASE_URL } from '../utils/config'
-import { createChart } from 'lightweight-charts'
-import { CandlestickSeries } from 'lightweight-charts'
 
 // 可用的交易品种
 const availableSymbols = ref(TRADING_SYMBOLS)
@@ -301,6 +299,7 @@ const fetchPrice = async () => {
 
 // 获取图表数据
 const fetchChartData = async () => {
+  console.log('开始获取K线数据...')
   chartData.value.loading = true
   try {
     const response = await fetch(
@@ -310,6 +309,8 @@ const fetchChartData = async () => {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
     const result = await response.json()
+
+    console.log('API返回数据:', result)
 
     // 转换为lightweight-charts需要的格式
     const ohlcData = result.data.map(item => {
@@ -323,8 +324,12 @@ const fetchChartData = async () => {
       }
     }).sort((a, b) => a.time - b.time) // 按时间排序
 
+    console.log('转换后的OHLC数据:', ohlcData)
+
     chartData.value.ohlc = ohlcData
     chartData.value.loading = false
+
+    console.log('准备渲染图表...')
 
     // 渲染K线图
     nextTick(() => {
@@ -337,80 +342,87 @@ const fetchChartData = async () => {
 }
 
 // 渲染图表
-const renderChart = () => {
+const renderChart = async () => {
   if (!priceChart.value || chartData.value.ohlc.length === 0) return
 
-  // 销毁现有图表
-  if (chartInstance) {
-    chartInstance.remove()
-  }
+  try {
+    // 动态导入lightweight-charts
+    const { createChart: createKLineChart } = await import('lightweight-charts')
 
-  // 创建图表容器
-  const container = priceChart.value
-
-  // 创建图表实例
-  chartInstance = createChart(container, {
-    width: container.clientWidth,
-    height: 400,
-    layout: {
-      background: { type: 'solid', color: '#ffffff' },
-      textColor: '#333',
-    },
-    grid: {
-      vertLines: { color: 'rgba(197, 203, 206, 0.5)' },
-      horzLines: { color: 'rgba(197, 203, 206, 0.5)' },
-    },
-    timeScale: {
-      borderColor: 'rgba(197, 203, 206, 0.8)',
-      timeVisible: true,
-      secondsVisible: false,
-    },
-    rightPriceScale: {
-      borderColor: 'rgba(197, 203, 206, 0.8)',
-    },
-    crosshair: {
-      mode: 1, // 十线模式
-      vertLine: {
-        color: '#758696',
-        width: 1,
-        style: 3, // 虚线
-        labelBackgroundColor: '#4c525e',
-      },
-      horzLine: {
-        color: '#758696',
-        width: 1,
-        style: 3, // 虚线
-        labelBackgroundColor: '#4c525e',
-      },
-    },
-  })
-
-  // 添加K线系列
-  candlestickSeries = chartInstance.addCandlestickSeries({
-    upColor: '#26a69a', // 涨 - 青色
-    downColor: '#ef5350', // 跌 - 红色
-    borderDownColor: '#ef5350',
-    borderUpColor: '#26a69a',
-    wickDownColor: '#ef5350',
-    wickUpColor: '#26a69a',
-  })
-
-  // 设置数据
-  candlestickSeries.setData(chartData.value.ohlc)
-
-  // 自动调整视图
-  chartInstance.timeScale().fitContent()
-
-  // 响应式调整
-  const resizeObserver = new ResizeObserver(entries => {
-    if (entries.length === 0 || entries[0].target !== container) {
-      return
+    // 销毁现有图表
+    if (chartInstance) {
+      chartInstance.remove()
     }
-    const newRect = entries[0].contentRect
-    chartInstance.applyOptions({ width: newRect.width - 32 })
-  })
 
-  resizeObserver.observe(container)
+    // 创建图表容器
+    const container = priceChart.value
+
+    // 创建图表实例
+    chartInstance = createKLineChart(container, {
+      width: container.clientWidth,
+      height: 400,
+      layout: {
+        background: { type: 'solid', color: '#ffffff' },
+        textColor: '#333',
+      },
+      grid: {
+        vertLines: { color: 'rgba(197, 203, 206, 0.5)' },
+        horzLines: { color: 'rgba(197, 203, 206, 0.5)' },
+      },
+      timeScale: {
+        borderColor: 'rgba(197, 203, 206, 0.8)',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(197, 203, 206, 0.8)',
+      },
+      crosshair: {
+        mode: 1, // 十线模式
+        vertLine: {
+          color: '#758696',
+          width: 1,
+          style: 3, // 虚线
+          labelBackgroundColor: '#4c525e',
+        },
+        horzLine: {
+          color: '#758696',
+          width: 1,
+          style: 3, // 虚线
+          labelBackgroundColor: '#4c525e',
+        },
+      },
+    })
+
+    // 添加K线系列
+    const candlestickSeries = chartInstance.addCandlestickSeries({
+      upColor: '#26a69a', // 涨 - 青色
+      downColor: '#ef5350', // 跌 - 红色
+      borderDownColor: '#ef5350',
+      borderUpColor: '#26a69a',
+      wickDownColor: '#ef5350',
+      wickUpColor: '#26a69a',
+    })
+
+    // 设置数据
+    candlestickSeries.setData(chartData.value.ohlc)
+
+    // 自动调整视图
+    chartInstance.timeScale().fitContent()
+
+    // 响应式调整
+    const resizeObserver = new ResizeObserver(entries => {
+      if (entries.length === 0 || entries[0].target !== container) {
+        return
+      }
+      const newRect = entries[0].contentRect
+      chartInstance.applyOptions({ width: newRect.width - 32 })
+    })
+
+    resizeObserver.observe(container)
+  } catch (error) {
+    console.error('渲染K线图失败:', error)
+  }
 }
 
 // 监听均线参数变化
