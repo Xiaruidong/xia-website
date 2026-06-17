@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
+    "chart.js": "^4.5.1",
     "gifshot": "^0.4.5",
     "pdfjs-dist": "^5.7.284",
     "vue": "^3.4.0",
+    "vue-chartjs": "^5.3.3",
     "vue-router": "^4.2.5"
   },
   "devDependencies": {

@@ -75,6 +75,43 @@
         </div>
       </section>
 
+      <!-- 价格走势图 -->
+      <section class="chart-section">
+        <h2 class="section-title">价格走势</h2>
+
+        <div class="chart-controls">
+          <div class="control-group">
+            <label>时间范围:</label>
+            <select v-model="chartPeriod" @change="fetchChartData">
+              <option value="1d">1天</option>
+              <option value="5d">5天</option>
+              <option value="1mo" selected>1个月</option>
+              <option value="3mo">3个月</option>
+              <option value="6mo">6个月</option>
+              <option value="1y">1年</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label>数据间隔:</label>
+            <select v-model="chartInterval" @change="fetchChartData">
+              <option value="5m">5分钟</option>
+              <option value="15m">15分钟</option>
+              <option value="1h">1小时</option>
+              <option value="1d" selected>1天</option>
+              <option value="1wk">1周</option>
+            </select>
+          </div>
+        </div>
+
+        <div v-if="chartData.loading" class="loading-state">
+          <p>正在加载图表数据...</p>
+        </div>
+
+        <div v-else class="chart-container">
+          <canvas ref="priceChart" width="800" height="400"></canvas>
+        </div>
+      </section>
+
       <!-- 均线分析 -->
       <section class="ma-section">
         <h2 class="section-title">均线分析</h2>
@@ -145,8 +182,12 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { fetchPriceData, fetchMAData, TRADING_SYMBOLS } from '../utils/config'
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { fetchPriceData, fetchMAData, TRADING_SYMBOLS, API_BASE_URL } from '../utils/config'
+import { Chart, registerables } from 'chart.js'
+
+// 注册Chart.js组件
+Chart.register(...registerables)
 
 // 可用的交易品种
 const availableSymbols = ref(TRADING_SYMBOLS)
@@ -180,6 +221,17 @@ const maData = ref({
   signalText: '等待数据...'
 })
 
+// 图表相关
+const priceChart = ref(null)
+const chartPeriod = ref('1mo')
+const chartInterval = ref('1d')
+const chartData = ref({
+  loading: false,
+  labels: [],
+  prices: []
+})
+let chartInstance = null
+
 // 状态管理
 const loading = ref(true)
 const error = ref('')
@@ -191,6 +243,7 @@ let updateInterval = null
 const switchSymbol = (symbol) => {
   currentSymbol.value = symbol
   fetchPrice()
+  fetchChartData()
 }
 
 // 获取价格数据
@@ -251,6 +304,143 @@ const fetchPrice = async () => {
   }
 }
 
+// 获取图表数据
+const fetchChartData = async () => {
+  chartData.value.loading = true
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/price/${currentSymbol.value.id}/history?period=${chartPeriod.value}&interval=${chartInterval.value}`
+    )
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    const data = await response.json()
+
+    // 更新图表数据
+    chartData.value.labels = data.data.map(item => item.date)
+    chartData.value.prices = data.data.map(item => item.close)
+    chartData.value.loading = false
+
+    // 渲染图表
+    nextTick(() => {
+      renderChart()
+    })
+  } catch (err) {
+    console.error('获取图表数据失败:', err)
+    chartData.value.loading = false
+  }
+}
+
+// 渲染图表
+const renderChart = () => {
+  if (!priceChart.value) return
+
+  // 销毁现有图表
+  if (chartInstance) {
+    chartInstance.destroy()
+  }
+
+  const ctx = priceChart.value.getContext('2d')
+
+  // 根据价格变化确定颜色
+  const firstPrice = chartData.value.prices[0] || 0
+  const lastPrice = chartData.value.prices[chartData.value.prices.length - 1] || 0
+  const isUp = lastPrice >= firstPrice
+  const lineColor = isUp ? '#4CAF50' : '#F44336'
+
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: chartData.value.labels,
+      datasets: [{
+        label: `${currentSymbol.value.name} 价格`,
+        data: chartData.value.prices,
+        borderColor: lineColor,
+        backgroundColor: isUp ? 'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: lineColor,
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 2,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            color: '#666',
+            font: {
+              size: 12
+            }
+          }
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+              return `价格: ${context.parsed.y.toFixed(2)}`
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          title: {
+            display: true,
+            text: '时间',
+            color: '#666',
+            font: {
+              size: 12
+            }
+          },
+          ticks: {
+            color: '#666',
+            maxTicksLimit: 10
+          },
+          grid: {
+            display: false
+          }
+        },
+        y: {
+          display: true,
+          title: {
+            display: true,
+            text: '价格',
+            color: '#666',
+            font: {
+              size: 12
+            }
+          },
+          ticks: {
+            color: '#666',
+            callback: function(value) {
+              return value.toFixed(2)
+            }
+          },
+          grid: {
+            color: 'rgba(0, 0, 0, 0.05)'
+          }
+        }
+      },
+      interaction: {
+        mode: 'nearest',
+        axis: 'x',
+        intersect: false
+      }
+    }
+  })
+}
+
 // 监听均线参数变化
 watch([maShort, maMedium, maLong], () => {
   if (!loading.value && currentPrice.value !== '--') {
@@ -277,6 +467,7 @@ watch([maShort, maMedium, maLong], () => {
 // 组件挂载时开始更新
 onMounted(() => {
   fetchPrice()
+  fetchChartData()
   // 每15秒更新一次
   updateInterval = setInterval(fetchPrice, 15000)
 })
@@ -285,6 +476,9 @@ onMounted(() => {
 onUnmounted(() => {
   if (updateInterval) {
     clearInterval(updateInterval)
+  }
+  if (chartInstance) {
+    chartInstance.destroy()
   }
 })
 </script>
@@ -484,6 +678,33 @@ onUnmounted(() => {
   font-size: 0.85rem;
   color: var(--浅青灰);
   margin-top: 20px;
+}
+
+/* 价格走势图 */
+.chart-section {
+  background: var(--柔白);
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 4px 20px rgba(200, 217, 230, 0.2);
+}
+
+.chart-controls {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.chart-container {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.chart-container canvas {
+  width: 100% !important;
+  height: auto !important;
 }
 
 /* 均线分析 */
