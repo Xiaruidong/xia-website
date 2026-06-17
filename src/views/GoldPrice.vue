@@ -199,10 +199,10 @@ const priceStats = ref({
   prevClose: '--'
 })
 
-// 均线参数
+// 均线参数（使用较小值以确保有足够历史数据）
 const maShort = ref('10')
-const maMedium = ref('60')
-const maLong = ref('120')
+const maMedium = ref('20')
+const maLong = ref('30')
 
 // 均线数据
 const maData = ref({
