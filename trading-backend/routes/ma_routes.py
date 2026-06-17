@@ -4,8 +4,15 @@ from typing import Optional
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
+import time
 
 router = APIRouter()
+
+# 配置yfinance使用用户代理，避免被限制
+try:
+    yf.utils.get_user_agent = lambda: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+except:
+    pass
 
 # 商品代码映射
 SYMBOL_MAP = {
@@ -42,49 +49,71 @@ async def get_moving_averages(
     - medium: 中期均线周期 (默认20)
     - long: 长期均线周期 (默认60)
     """
-    try:
-        ticker_symbol = SYMBOL_MAP.get(symbol.lower(), symbol.upper())
-        ticker = yf.Ticker(ticker_symbol)
+    max_retries = 3
+    retry_delay = 2  # 秒
 
-        # 获取足够的历史数据来计算长期均线
-        # 至少需要long天的数据，加上一些缓冲
-        data = ticker.history(period=f"{long + 10}d", interval='1d')
+    for attempt in range(max_retries):
+        try:
+            ticker_symbol = SYMBOL_MAP.get(symbol.lower(), symbol.upper())
 
-        if data.empty or len(data) < long:
-            raise HTTPException(
-                status_code=404,
-                detail=f"数据不足，需要至少{long}天的历史数据"
+            # 添加请求间隔，避免频率限制
+            if attempt > 0:
+                time.sleep(retry_delay)
+
+            ticker = yf.Ticker(ticker_symbol)
+
+            # 获取足够的历史数据来计算长期均线
+            # 至少需要long天的数据，加上一些缓冲
+            data = ticker.history(period=f"{max(long, medium, short) + 10}d", interval='1d')
+
+            if data.empty or len(data) < long:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"数据不足，需要至少{long}天的历史数据"
+                )
+
+            # 计算移动平均线
+            ma_short_value = data['Close'].tail(short).mean()
+            ma_medium_value = data['Close'].tail(medium).mean()
+            ma_long_value = data['Close'].tail(long).mean()
+
+            # 当前价格
+            current_price = data['Close'].iloc[-1]
+
+            # 生成交易信号
+            signal, signal_text = generate_signal(
+                current_price,
+                ma_short_value,
+                ma_medium_value,
+                ma_long_value
             )
 
-        # 计算移动平均线
-        ma_short_value = data['Close'].tail(short).mean()
-        ma_medium_value = data['Close'].tail(medium).mean()
-        ma_long_value = data['Close'].tail(long).mean()
+            return MAResponse(
+                symbol=symbol,
+                current_price=round(current_price, 2),
+                ma_short=round(ma_short_value, 2),
+                ma_medium=round(ma_medium_value, 2),
+                ma_long=round(ma_long_value, 2),
+                signal=signal,
+                signal_text=signal_text,
+                update_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            )
 
-        # 当前价格
-        current_price = data['Close'].iloc[-1]
+            # 如果成功获取数据，跳出重试循环
+            break
 
-        # 生成交易信号
-        signal, signal_text = generate_signal(
-            current_price,
-            ma_short_value,
-            ma_medium_value,
-            ma_long_value
-        )
+        except HTTPException:
+            # 如果是HTTP异常，直接抛出
+            raise
+        except Exception as e:
+            # 如果是最后一次尝试，抛出异常
+            if attempt == max_retries - 1:
+                raise HTTPException(status_code=500, detail=f"计算均线失败: {str(e)}")
+            # 否则继续重试
+            continue
 
-        return MAResponse(
-            symbol=symbol,
-            current_price=round(current_price, 2),
-            ma_short=round(ma_short_value, 2),
-            ma_medium=round(ma_medium_value, 2),
-            ma_long=round(ma_long_value, 2),
-            signal=signal,
-            signal_text=signal_text,
-            update_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"计算均线失败: {str(e)}")
+    # 如果所有重试都失败
+    raise HTTPException(status_code=500, detail="计算均线失败：已达到最大重试次数")
 
 def generate_signal(price, ma_short, ma_medium, ma_long):
     """

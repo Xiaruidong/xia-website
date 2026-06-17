@@ -343,22 +343,26 @@ const fetchChartData = async () => {
 
 // 渲染图表
 const renderChart = async () => {
-  if (!priceChart.value || chartData.value.ohlc.length === 0) return
+  if (!priceChart.value || chartData.value.ohlc.length === 0) {
+    console.log('图表容器或数据未准备好')
+    return
+  }
 
   try {
     // 动态导入lightweight-charts
-    const { createChart: createKLineChart } = await import('lightweight-charts')
+    const LightweightCharts = await import('lightweight-charts')
 
     // 销毁现有图表
     if (chartInstance) {
       chartInstance.remove()
+      chartInstance = null
     }
 
     // 创建图表容器
     const container = priceChart.value
 
     // 创建图表实例
-    chartInstance = createKLineChart(container, {
+    chartInstance = LightweightCharts.createChart(container, {
       width: container.clientWidth,
       height: 400,
       layout: {
@@ -378,17 +382,17 @@ const renderChart = async () => {
         borderColor: 'rgba(197, 203, 206, 0.8)',
       },
       crosshair: {
-        mode: 1, // 十线模式
+        mode: LightweightCharts.CrosshairMode.Normal,
         vertLine: {
           color: '#758696',
           width: 1,
-          style: 3, // 虚线
+          style: LightweightCharts.LineStyle.Dotted,
           labelBackgroundColor: '#4c525e',
         },
         horzLine: {
           color: '#758696',
           width: 1,
-          style: 3, // 虚线
+          style: LightweightCharts.LineStyle.Dotted,
           labelBackgroundColor: '#4c525e',
         },
       },
@@ -409,6 +413,8 @@ const renderChart = async () => {
 
     // 自动调整视图
     chartInstance.timeScale().fitContent()
+
+    console.log('K线图渲染成功')
 
     // 响应式调整
     const resizeObserver = new ResizeObserver(entries => {
