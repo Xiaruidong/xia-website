@@ -120,8 +120,7 @@
           <div class="control-group">
             <label>短期均线:</label>
             <select v-model="maShort">
-              <option value="5">MA5</option>
-              <option value="10">MA10</option>
+              <option value="10" selected>MA10</option>
               <option value="20">MA20</option>
             </select>
           </div>
@@ -129,15 +128,13 @@
             <label>中期均线:</label>
             <select v-model="maMedium">
               <option value="20">MA20</option>
-              <option value="30">MA30</option>
-              <option value="60">MA60</option>
+              <option value="60" selected>MA60</option>
             </select>
           </div>
           <div class="control-group">
             <label>长期均线:</label>
             <select v-model="maLong">
-              <option value="60">MA60</option>
-              <option value="120">MA120</option>
+              <option value="120" selected>MA120</option>
               <option value="200">MA200</option>
             </select>
           </div>
@@ -205,9 +202,9 @@ const priceStats = ref({
 })
 
 // 均线参数
-const maShort = ref('5')
-const maMedium = ref('20')
-const maLong = ref('60')
+const maShort = ref('10')
+const maMedium = ref('60')
+const maLong = ref('120')
 
 // 均线数据
 const maData = ref({
